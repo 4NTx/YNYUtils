@@ -26,6 +26,9 @@ public final class YNYConfig {
     public volatile int customReachToggleKey;
     public volatile boolean customReachStatusHudEnabled = true;
     public volatile boolean attackDiagnosticsEnabled;
+    public volatile boolean autoArmorEnabled;
+    public volatile int autoArmorToggleKey;
+    public volatile boolean autoArmorStatusHudEnabled = true;
 
     public static YNYConfig load() {
         File file = file();

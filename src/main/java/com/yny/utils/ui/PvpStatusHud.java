@@ -8,20 +8,24 @@ import dev.xavier.stein.loader.api.HudPlacement;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 
-/** Notificações temporárias de KB e Reach, posicionáveis pelo HUD do Stein. */
+/** Notificações temporárias de módulos PvP, posicionáveis pelo HUD do Stein. */
 public final class PvpStatusHud implements HudElement {
 
     private static final long DISPLAY_NANOS = 2_500_000_000L;
     private static final String KB_ENABLED = "Knockback: ATIVADO";
     private static final String KB_DISABLED = "Knockback: DESATIVADO";
     private static final String WIDEST_MESSAGE = "Reach: DESATIVADO (3.9 blocos)";
+    private static final String AUTO_ARMOR_ENABLED = "Auto Armor: ATIVADO";
+    private static final String AUTO_ARMOR_DISABLED = "Auto Armor: DESATIVADO";
 
     private final BooleanSupplier knockbackNotificationsEnabled;
     private final BooleanSupplier reachNotificationsEnabled;
+    private final BooleanSupplier autoArmorNotificationsEnabled;
     private String message = KB_ENABLED;
     private int color = 0x55FF55;
     private long visibleUntil;
     private boolean reachMessage;
+    private boolean autoArmorMessage;
     private FontRenderer measuredFont;
     private boolean measuredUnicode;
     private int measuredWidth;
@@ -30,15 +34,18 @@ public final class PvpStatusHud implements HudElement {
         measuredFont = null;
     }
 
-    public PvpStatusHud(BooleanSupplier knockbackNotificationsEnabled, BooleanSupplier reachNotificationsEnabled) {
+    public PvpStatusHud(BooleanSupplier knockbackNotificationsEnabled, BooleanSupplier reachNotificationsEnabled,
+            BooleanSupplier autoArmorNotificationsEnabled) {
         this.knockbackNotificationsEnabled = knockbackNotificationsEnabled;
         this.reachNotificationsEnabled = reachNotificationsEnabled;
+        this.autoArmorNotificationsEnabled = autoArmorNotificationsEnabled;
     }
 
     public void showKnockback(boolean enabled) {
         message = enabled ? KB_ENABLED : KB_DISABLED;
         color = enabled ? 0x55FF55 : 0xFF5555;
         reachMessage = false;
+        autoArmorMessage = false;
         visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
 
@@ -47,6 +54,15 @@ public final class PvpStatusHud implements HudElement {
                 + String.format(Locale.ROOT, "%.1f", distance) + " blocos)";
         color = enabled ? 0x55AAFF : 0xFF5555;
         reachMessage = true;
+        autoArmorMessage = false;
+        visibleUntil = System.nanoTime() + DISPLAY_NANOS;
+    }
+
+    public void showAutoArmor(boolean enabled) {
+        message = enabled ? AUTO_ARMOR_ENABLED : AUTO_ARMOR_DISABLED;
+        color = enabled ? 0x55FF55 : 0xFF5555;
+        reachMessage = false;
+        autoArmorMessage = true;
         visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
 
@@ -64,7 +80,8 @@ public final class PvpStatusHud implements HudElement {
     @Override
     public boolean layout(boolean preview, float partialTicks) {
         boolean enabled = reachMessage ? reachNotificationsEnabled.getAsBoolean()
-                : knockbackNotificationsEnabled.getAsBoolean();
+                : autoArmorMessage ? autoArmorNotificationsEnabled.getAsBoolean()
+                        : knockbackNotificationsEnabled.getAsBoolean();
         return preview || enabled && System.nanoTime() < visibleUntil;
     }
 
@@ -72,8 +89,9 @@ public final class PvpStatusHud implements HudElement {
     public int width() {
         FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
         if (font != measuredFont || font.getUnicodeFlag() != measuredUnicode) {
-            measuredWidth = Math.max(font.getStringWidth(WIDEST_MESSAGE),
-                    Math.max(font.getStringWidth(KB_ENABLED), font.getStringWidth(KB_DISABLED)));
+            measuredWidth = Math.max(Math.max(font.getStringWidth(WIDEST_MESSAGE),
+                    Math.max(font.getStringWidth(KB_ENABLED), font.getStringWidth(KB_DISABLED))),
+                    Math.max(font.getStringWidth(AUTO_ARMOR_ENABLED), font.getStringWidth(AUTO_ARMOR_DISABLED)));
             measuredFont = font;
             measuredUnicode = font.getUnicodeFlag();
         }

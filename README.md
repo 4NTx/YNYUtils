@@ -46,6 +46,14 @@ Detalhes, limitações e testes: [`docs/reach-improvements.md`](docs/reach-impro
 O relatório técnico está em
 [`docs/knockback-control-compatibility.md`](docs/knockback-control-compatibility.md).
 
+## Auto Armor
+
+Reequipa peças que ficaram vazias usando armaduras compatíveis da bolsa/hotbar.
+Prioriza maior proteção e, em empate, melhor durabilidade. Usa a API de inventário
+do Stein, sem abrir telas nem mexer nos controles de movimento. Faz no máximo uma
+troca a cada dois ticks e espera antes de tentar de novo se a confirmação demorar.
+Desativado por padrão; configuração, tecla e notificação ficam no Panel.
+
 ## Compilação
 
 Requer JDK 25 e o Stein SDK preparado para Minecraft 1.8.9:

@@ -5,6 +5,7 @@ import com.yny.utils.core.ToggleKey;
 import com.yny.utils.modules.pvp.AttackDiagnostics;
 import com.yny.utils.modules.pvp.KnockbackControl;
 import com.yny.utils.modules.pvp.CustomReach;
+import com.yny.utils.modules.player.AutoArmor;
 import com.yny.utils.ui.PvpStatusHud;
 import com.yny.utils.ui.AttackDiagnosticsHud;
 import net.minecraft.entity.Entity;
@@ -25,9 +26,12 @@ public final class YNYUtils implements SteinMod {
     private final CustomReach customReach = new CustomReach(
             () -> config.customReachEnabled, () -> config.customReachDistance);
     private final PvpStatusHud pvpStatusHud = new PvpStatusHud(
-            () -> config.knockbackStatusHudEnabled, () -> config.customReachStatusHudEnabled);
+            () -> config.knockbackStatusHudEnabled, () -> config.customReachStatusHudEnabled,
+            () -> config.autoArmorStatusHudEnabled);
     private final ToggleKey knockbackToggleKey = new ToggleKey();
     private final ToggleKey customReachToggleKey = new ToggleKey();
+    private final ToggleKey autoArmorToggleKey = new ToggleKey();
+    private final AutoArmor autoArmor = new AutoArmor(() -> config.autoArmorEnabled);
     private final AttackDiagnosticsHud attackDiagnosticsHud = new AttackDiagnosticsHud(
             () -> config.attackDiagnosticsEnabled);
     private final AttackDiagnostics attackDiagnostics = new AttackDiagnostics(
@@ -46,6 +50,7 @@ public final class YNYUtils implements SteinMod {
     public void onTickEnd() {
         knockbackControl.installIfPending();
         updateToggleKey();
+        autoArmor.onTickEnd();
         customReach.onTickEnd();
         attackDiagnostics.onTickEnd();
         saveConfigIfDue();
@@ -106,6 +111,21 @@ public final class YNYUtils implements SteinMod {
                     attackDiagnostics.reset();
                     attackDiagnostics.onTickEnd();
                     markConfigChanged();
+                }))
+                .section("Auto Armor")
+                .option(Option.toggle("Auto Armor", () -> config.autoArmorEnabled, value -> {
+                    config.autoArmorEnabled = value;
+                    pvpStatusHud.showAutoArmor(value);
+                    markConfigChanged();
+                }))
+                .option(Option.key("Tecla para alternar Auto Armor", () -> config.autoArmorToggleKey, value -> {
+                    config.autoArmorToggleKey = value;
+                    markConfigChanged();
+                }))
+                .option(Option.toggle("Mostrar notificação do Auto Armor", () -> config.autoArmorStatusHudEnabled,
+                        value -> {
+                            config.autoArmorStatusHudEnabled = value;
+                            markConfigChanged();
                 }));
     }
 
@@ -160,6 +180,11 @@ public final class YNYUtils implements SteinMod {
             markConfigChanged();
         }
         updateCustomReachToggleKey();
+        if (autoArmorToggleKey.wasPressed(config.autoArmorToggleKey)) {
+            config.autoArmorEnabled = !config.autoArmorEnabled;
+            pvpStatusHud.showAutoArmor(config.autoArmorEnabled);
+            markConfigChanged();
+        }
     }
 
     private void updateCustomReachToggleKey() {

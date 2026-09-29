@@ -59,7 +59,7 @@ public final class KnockbackControl {
         if (!enabled.getAsBoolean() || packet.getEntityID() != localPlayerId) {
             return;
         }
-        int value = Math.max(7, Math.min(100, percent.getAsInt()));
+        int value = Math.max(93, Math.min(100, percent.getAsInt()));
         if (value == 100) {
             return;
         }

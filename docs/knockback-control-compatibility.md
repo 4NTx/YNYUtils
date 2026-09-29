@@ -29,4 +29,4 @@ de um `S12PacketEntityVelocity` cujo `entityID` seja o do jogador local.
 
 O pacote então segue normalmente para `NetHandlerPlayClient`, que divide os
 valores por 8000 e chama `Entity.setVelocity`. Assim, 100% mantém os inteiros
-originais; 50% usa 0,50; e 7% usa 0,07, com arredondamento ao inteiro do pacote.
+originais; o mínimo de 93% usa o fator 0,93, com arredondamento ao inteiro do pacote.

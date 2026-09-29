@@ -33,7 +33,7 @@ public final class YNYUtils implements SteinMod {
                     config.knockbackEnabled = value;
                     YNYConfig.save(config);
                 }))
-                .option(Option.slider("Knockback", 7, 100, 1, () -> config.knockbackPercent, value -> {
+                .option(Option.slider("Knockback", 93, 100, 1, () -> config.knockbackPercent, value -> {
                     config.knockbackPercent = (int) value;
                     YNYConfig.save(config);
                 }, value -> (int) value + "%"));

@@ -10,7 +10,7 @@ para recursos que tenham uma necessidade concreta e hooks oficiais do SDK.
 
 Intercepta somente `S12PacketEntityVelocity` destinado ao jogador local,
 antes de o manipulador vanilla aplicar `motionX`, `motionY` e `motionZ`.
-O Panel oferece ativação e percentual entre 7% e 100% (padrão: 100%).
+O Panel oferece ativação e percentual entre 93% e 100% (padrão: 100%).
 O relatório técnico está em
 [`docs/knockback-control-compatibility.md`](docs/knockback-control-compatibility.md).
 

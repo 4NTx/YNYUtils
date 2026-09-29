@@ -29,7 +29,7 @@ public final class YNYConfig {
             if (config == null) {
                 return new YNYConfig();
             }
-            config.knockbackPercent = Math.max(7, Math.min(100, config.knockbackPercent));
+            config.knockbackPercent = Math.max(93, Math.min(100, config.knockbackPercent));
             return config;
         } catch (Exception ignored) {
             return new YNYConfig();

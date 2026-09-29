@@ -21,8 +21,6 @@ public final class YNYConfig {
     public volatile int knockbackPercent = 100;
     public volatile int knockbackToggleKey;
     public volatile boolean knockbackStatusHudEnabled = true;
-    public volatile boolean reachDebugEnabled;
-    public volatile double reachDebugReach = 3.0D;
     public volatile boolean customReachEnabled;
     public volatile double customReachDistance = 3.0D;
     public volatile int customReachToggleKey;
@@ -64,7 +62,6 @@ public final class YNYConfig {
 
     private void sanitize() {
         knockbackPercent = Math.max(93, Math.min(100, knockbackPercent));
-        reachDebugReach = ReachRange.clamp(reachDebugReach);
         customReachDistance = ReachRange.clamp(customReachDistance);
     }
 }

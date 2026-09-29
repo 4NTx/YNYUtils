@@ -22,13 +22,6 @@ Ao ativar ou desativar o Knockback Control, uma notificação temporária aparec
 Ela pode ser movida, escalada ou ocultada pelo editor de HUD do Stein Loader.
 Ela também pode ser ligada ou desligada em `Mostrar notificação do KB` no Panel.
 
-## Reach Debug
-
-Ferramenta somente de diagnóstico. Quando ativada, mostra no HUD o alvo que o
-Minecraft já está apontando, a distância até a hitbox, o alcance vanilla atual e
-o alcance configurado para diagnóstico (3,0 a 3,9 blocos). Ela não modifica
-raycast, alcance, hitbox, ataque, pacotes ou posições.
-
 ## Custom Reach
 
 Quando ligado, substitui apenas a seleção local de uma entidade na linha da

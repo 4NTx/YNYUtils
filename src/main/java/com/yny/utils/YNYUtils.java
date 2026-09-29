@@ -4,7 +4,6 @@ import com.yny.utils.config.YNYConfig;
 import com.yny.utils.core.ToggleKey;
 import com.yny.utils.modules.pvp.KnockbackControl;
 import com.yny.utils.modules.pvp.CustomReach;
-import com.yny.utils.modules.pvp.ReachDebug;
 import com.yny.utils.ui.PvpStatusHud;
 
 import dev.xavier.stein.loader.api.Hud;
@@ -22,8 +21,6 @@ public final class YNYUtils implements SteinMod {
             () -> config.knockbackEnabled, () -> config.knockbackPercent);
     private final CustomReach customReach = new CustomReach(
             () -> config.customReachEnabled, () -> config.customReachDistance);
-    private final ReachDebug reachDebug = new ReachDebug(
-            () -> config.reachDebugEnabled, () -> config.reachDebugReach);
     private final PvpStatusHud pvpStatusHud = new PvpStatusHud(
             () -> config.knockbackStatusHudEnabled, () -> config.customReachStatusHudEnabled);
     private final ToggleKey knockbackToggleKey = new ToggleKey();
@@ -40,7 +37,6 @@ public final class YNYUtils implements SteinMod {
     @Override
     public void onTickEnd() {
         knockbackControl.installIfPending();
-        reachDebug.update();
         updateToggleKey();
         saveConfigIfDue();
     }
@@ -72,16 +68,6 @@ public final class YNYUtils implements SteinMod {
                     config.knockbackStatusHudEnabled = value;
                     markConfigChanged();
                 }))
-                .section("Diagnóstico")
-                .option(Option.toggle("Reach Debug", () -> config.reachDebugEnabled, value -> {
-                    config.reachDebugEnabled = value;
-                    markConfigChanged();
-                }))
-                .option(Option.slider("Alcance de diagnóstico", ReachDebug.VANILLA_REACH, ReachDebug.MAX_REACH, 0.1,
-                        () -> config.reachDebugReach, value -> {
-                            config.reachDebugReach = value;
-                            markConfigChanged();
-                        }, value -> String.format("%.1f blocos", value)))
                 .section("Custom Reach")
                 .option(Option.toggle("Custom Reach", () -> config.customReachEnabled, value -> {
                     config.customReachEnabled = value;
@@ -106,7 +92,6 @@ public final class YNYUtils implements SteinMod {
     @Override
     public void onOverlay(float partialTicks) {
         customReach.apply();
-        reachDebug.draw();
     }
 
     private void updateToggleKey() {

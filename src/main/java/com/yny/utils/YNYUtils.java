@@ -8,6 +8,8 @@ import com.yny.utils.modules.pvp.CustomReach;
 import com.yny.utils.modules.player.AutoArmor;
 import com.yny.utils.ui.PvpStatusHud;
 import com.yny.utils.ui.AttackDiagnosticsHud;
+import com.yny.targethealth.TargetHealthElement;
+import com.yny.targethealth.TargetHealthMod;
 import net.minecraft.entity.Entity;
 
 import dev.xavier.stein.loader.api.Hud;
@@ -39,14 +41,17 @@ public final class YNYUtils implements SteinMod {
             () -> config.attackDiagnosticsEnabled);
     private final AttackDiagnostics attackDiagnostics = new AttackDiagnostics(
             () -> config.attackDiagnosticsEnabled, customReach::effectiveReach, attackDiagnosticsHud);
+    private final TargetHealthElement targetHealthElement = new TargetHealthElement();
     private boolean configDirty;
     private int configSaveDelay;
 
     @Override
     public void afterStartGame() {
         config = YNYConfig.load();
+        TargetHealthMod.initialize();
         Hud.register(pvpStatusHud);
         Hud.register(attackDiagnosticsHud);
+        Hud.register(targetHealthElement);
     }
 
     @Override
@@ -56,6 +61,7 @@ public final class YNYUtils implements SteinMod {
         autoArmor.onTickEnd();
         customReach.onTickEnd();
         attackDiagnostics.onTickEnd();
+        targetHealthElement.updateDistantTarget();
         saveConfigIfDue();
     }
 
@@ -152,6 +158,7 @@ public final class YNYUtils implements SteinMod {
                             config.autoArmorDropUnenchantedOld = value;
                             markConfigChanged();
                         }));
+        TargetHealthMod.addOptions(page);
     }
 
     @Override

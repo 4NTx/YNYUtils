@@ -46,6 +46,16 @@ Detalhes, limitações e testes: [`docs/reach-improvements.md`](docs/reach-impro
 O relatório técnico está em
 [`docs/knockback-control-compatibility.md`](docs/knockback-control-compatibility.md).
 
+## YNY Damage Indicator
+
+Integrado ao mesmo `.steinmod`, com uma seção própria no Panel e um HUD
+independente para nome, vida, absorção e alvos distantes. Mantém o ID
+`ynydamageindicator.target` e continua usando
+`config/ynydamageindicator.json`, preservando posição e preferências anteriores.
+Não altera seleção/alcance de ataque, cliques ou packets. O `.steinmod`
+YNYDamageIndicator separado não deve ficar ativo junto com YNYUtils para evitar
+registrar duas cópias do mesmo HUD.
+
 ## Auto Armor
 
 Permanece ativado até você desligar, inclusive se acabar o estoque. Por padrão,

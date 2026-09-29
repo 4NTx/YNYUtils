@@ -26,8 +26,9 @@ public final class YNYUtils implements SteinMod {
     private final ReachDebug reachDebug = new ReachDebug(
             () -> config.reachDebugEnabled, () -> config.reachDebugReach);
     private final KnockbackStatusHud knockbackStatusHud = new KnockbackStatusHud(
-            () -> config.knockbackStatusHudEnabled);
+            () -> config.knockbackStatusHudEnabled, () -> config.customReachStatusHudEnabled);
     private boolean toggleKeyWasDown;
+    private boolean customReachToggleKeyWasDown;
     private boolean configDirty;
     private int configSaveDelay;
 
@@ -57,7 +58,7 @@ public final class YNYUtils implements SteinMod {
                 .section("PvP")
                 .option(Option.toggle("Ativar Knockback Control", () -> config.knockbackEnabled, value -> {
                     config.knockbackEnabled = value;
-                    knockbackStatusHud.show(value);
+                    knockbackStatusHud.showKnockback(value);
                     markConfigChanged();
                 }))
                 .option(Option.slider("Velocidade recebida", 93, 100, 1, () -> config.knockbackPercent, value -> {
@@ -85,13 +86,22 @@ public final class YNYUtils implements SteinMod {
                 .section("Custom Reach")
                 .option(Option.toggle("Custom Reach", () -> config.customReachEnabled, value -> {
                     config.customReachEnabled = value;
+                    knockbackStatusHud.showReach(value, config.customReachDistance);
                     markConfigChanged();
                 }))
                 .option(Option.slider("Alcance", CustomReach.VANILLA_REACH, CustomReach.MAX_REACH, 0.1,
                         () -> config.customReachDistance, value -> {
                             config.customReachDistance = value;
                             markConfigChanged();
-                        }, value -> String.format("%.1f blocos", value)));
+                        }, value -> String.format("%.1f blocos", value)))
+                .option(Option.key("Tecla para alternar Reach", () -> config.customReachToggleKey, value -> {
+                    config.customReachToggleKey = value;
+                    markConfigChanged();
+                }))
+                .option(Option.toggle("Mostrar notificação do Reach", () -> config.customReachStatusHudEnabled, value -> {
+                    config.customReachStatusHudEnabled = value;
+                    markConfigChanged();
+                }));
     }
 
     @Override
@@ -106,10 +116,23 @@ public final class YNYUtils implements SteinMod {
                 && Keyboard.isKeyDown(key);
         if (down && !toggleKeyWasDown) {
             config.knockbackEnabled = !config.knockbackEnabled;
-            knockbackStatusHud.show(config.knockbackEnabled);
+            knockbackStatusHud.showKnockback(config.knockbackEnabled);
             markConfigChanged();
         }
         toggleKeyWasDown = down;
+        updateCustomReachToggleKey();
+    }
+
+    private void updateCustomReachToggleKey() {
+        int key = config.customReachToggleKey;
+        boolean down = key != Keyboard.KEY_NONE && Minecraft.getMinecraft().currentScreen == null
+                && Keyboard.isKeyDown(key);
+        if (down && !customReachToggleKeyWasDown) {
+            config.customReachEnabled = !config.customReachEnabled;
+            knockbackStatusHud.showReach(config.customReachEnabled, config.customReachDistance);
+            markConfigChanged();
+        }
+        customReachToggleKeyWasDown = down;
     }
 
     /** Agrupa mudanças rápidas de UI/keybind em uma única escrita no disco. */

@@ -24,6 +24,8 @@ public final class YNYConfig {
     public volatile double reachDebugReach = 3.0D;
     public volatile boolean customReachEnabled;
     public volatile double customReachDistance = 3.0D;
+    public volatile int customReachToggleKey;
+    public volatile boolean customReachStatusHudEnabled = true;
 
     public static YNYConfig load() {
         File file = file();

@@ -9,14 +9,16 @@ import net.minecraft.client.gui.FontRenderer;
 public final class KnockbackStatusHud implements HudElement {
 
     private static final long DISPLAY_NANOS = 2_500_000_000L;
+    private static final String ENABLED_MESSAGE = "Knockback: ATIVADO";
+    private static final String DISABLED_MESSAGE = "Knockback: DESATIVADO";
 
-    private String message = "Knockback: ATIVADO";
+    private String message = ENABLED_MESSAGE;
     private int color = 0x55FF55;
     private long visibleUntil;
 
     /** Mostra a mudança de estado por um curto período. */
     public void show(boolean enabled) {
-        message = enabled ? "Knockback: ATIVADO" : "Knockback: DESATIVADO";
+        message = enabled ? ENABLED_MESSAGE : DISABLED_MESSAGE;
         color = enabled ? 0x55FF55 : 0xFF5555;
         visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
@@ -38,7 +40,10 @@ public final class KnockbackStatusHud implements HudElement {
 
     @Override
     public int width() {
-        return Minecraft.getMinecraft().fontRendererObj.getStringWidth(message);
+        FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
+        // A caixa não muda quando o texto troca; assim a posição configurada no
+        // editor não oscila entre "ATIVADO" e "DESATIVADO".
+        return Math.max(font.getStringWidth(ENABLED_MESSAGE), font.getStringWidth(DISABLED_MESSAGE));
     }
 
     @Override

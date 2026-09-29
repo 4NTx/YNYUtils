@@ -36,6 +36,11 @@ public final class CustomReach {
     private float cachedYaw, cachedPitch;
     private MovingObjectPosition cachedResult;
     private MovingObjectPosition cachedBaseline;
+    private Entity debugTarget;
+    private double debugContact = Double.NaN;
+    private double debugBlockDistance = Double.NaN;
+    private boolean debugSelected;
+    private boolean debugBlocked;
 
     public CustomReach(BooleanSupplier enabled, DoubleSupplier reach) {
         this.enabled = enabled;
@@ -53,6 +58,7 @@ public final class CustomReach {
     public void onFrame(float partialTicks) {
         epoch++;
         synchronize(partialTicks);
+        updateDebug(partialTicks);
     }
 
     /** runTick calcula a mira com partialTicks=1 antes de consumir as teclas. */
@@ -79,6 +85,11 @@ public final class CustomReach {
         cachedCamera = null;
         cachedResult = null;
         cachedEpoch = -1;
+        debugTarget = null;
+        debugContact = Double.NaN;
+        debugBlockDistance = Double.NaN;
+        debugSelected = false;
+        debugBlocked = false;
     }
 
     private void synchronize(float partialTicks) {
@@ -138,5 +149,81 @@ public final class CustomReach {
             mc.pointedEntity = mc.theWorld == baselineWorld ? baselinePointed : null;
         }
         applied = null;
+    }
+
+    public boolean isEnabled() {
+        return enabled.getAsBoolean();
+    }
+
+    public boolean isDebugVisible() {
+        Minecraft mc = Minecraft.getMinecraft();
+        return enabled.getAsBoolean() && mc.currentScreen == null && mc.theWorld != null
+                && mc.thePlayer != null && mc.getRenderViewEntity() == mc.thePlayer;
+    }
+
+    public Entity debugTarget() {
+        return debugTarget;
+    }
+
+    public double debugContact() {
+        return debugContact;
+    }
+
+    public double debugLimit() {
+        return effectiveReach();
+    }
+
+    public boolean debugSelected() {
+        return debugSelected;
+    }
+
+    public boolean debugBlocked() {
+        return debugBlocked;
+    }
+
+    public double debugBlockDistance() {
+        return debugBlockDistance;
+    }
+
+    private void updateDebug(float partialTicks) {
+        debugTarget = null;
+        debugContact = Double.NaN;
+        debugBlockDistance = Double.NaN;
+        debugSelected = false;
+        debugBlocked = false;
+        Minecraft mc = Minecraft.getMinecraft();
+        if (!enabled.getAsBoolean() || mc.theWorld == null || mc.thePlayer == null
+                || mc.currentScreen != null || mc.getRenderViewEntity() != mc.thePlayer
+                || mc.playerController == null) {
+            return;
+        }
+
+        double limit = effectiveReach();
+        MovingObjectPosition current = mc.objectMouseOver;
+        MovingObjectPosition diagnosticHit;
+        if (current != null && current.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY) {
+            diagnosticHit = current;
+        } else if (limit > VANILLA_REACH) {
+            diagnosticHit = EntityReachRaycast.select(mc, partialTicks,
+                    Math.max(limit, mc.playerController.getBlockReachDistance()), baseline);
+        } else {
+            diagnosticHit = current;
+        }
+        if (diagnosticHit != null && diagnosticHit.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY
+                && diagnosticHit.entityHit != null && diagnosticHit.hitVec != null) {
+            debugTarget = diagnosticHit.entityHit;
+            debugContact = mc.thePlayer.getPositionEyes(partialTicks).distanceTo(diagnosticHit.hitVec);
+            debugSelected = current != null && current.typeOfHit == MovingObjectPosition.MovingObjectType.ENTITY
+                    && current.entityHit == debugTarget;
+        } else {
+            MovingObjectPosition block = diagnosticHit != null
+                    && diagnosticHit.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK ? diagnosticHit
+                    : current != null && current.typeOfHit == MovingObjectPosition.MovingObjectType.BLOCK
+                            ? current : null;
+            if (block != null && block.hitVec != null) {
+                debugBlocked = true;
+                debugBlockDistance = mc.thePlayer.getPositionEyes(partialTicks).distanceTo(block.hitVec);
+            }
+        }
     }
 }

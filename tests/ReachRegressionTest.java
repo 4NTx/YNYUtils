@@ -74,6 +74,10 @@ public final class ReachRegressionTest {
         check(mc.objectMouseOver.entityHit == target, "alvo estendido selecionado no input");
         check(camera.lastPartialTicks == 1, "input usa partialTicks=1");
         check(Math.abs(mc.objectMouseOver.hitVec.zCoord - 3.4) < 0.00001, "distância até contato");
+        reach.onFrame(0.6F);
+        check(reach.debugTarget() == target && reach.debugSelected(), "debug acompanha o alvo selecionado");
+        check(Math.abs(reach.debugContact() - 3.4) < 0.00001, "debug mede o ponto de contato");
+        reach.onInput();
         int queries = world.queries;
         MovingObjectPosition selected = mc.objectMouseOver;
         reach.onInput();
@@ -139,6 +143,9 @@ public final class ReachRegressionTest {
         world.entities.add(player(4.4));
         reach.onFrame(1);
         check(mc.objectMouseOver == replacement, "limite 3.9 exclui contato além dele");
+        check(reach.debugTarget() != null && !reach.debugSelected()
+                && reach.debugContact() > 3.9 && reach.debugContact() < 4.1,
+                "debug mostra entidade fora de 3.9 até o alcance vanilla de bloco");
         MovingObjectPosition nativeEntity = new MovingObjectPosition(target, new Vec3(0, 0, 2));
         mc.objectMouseOver = nativeEntity;
         queries = world.queries;

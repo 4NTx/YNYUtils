@@ -7,6 +7,7 @@ import com.yny.utils.modules.pvp.KnockbackControl;
 import com.yny.utils.modules.pvp.CustomReach;
 import com.yny.utils.ui.PvpStatusHud;
 import com.yny.utils.ui.AttackDiagnosticsHud;
+import com.yny.utils.ui.ReachDebugOverlay;
 import net.minecraft.entity.Entity;
 
 import dev.xavier.stein.loader.api.Hud;
@@ -28,6 +29,7 @@ public final class YNYUtils implements SteinMod {
             () -> config.knockbackStatusHudEnabled, () -> config.customReachStatusHudEnabled);
     private final ToggleKey knockbackToggleKey = new ToggleKey();
     private final ToggleKey customReachToggleKey = new ToggleKey();
+    private final ReachDebugOverlay reachDebugOverlay = new ReachDebugOverlay();
     private final AttackDiagnosticsHud attackDiagnosticsHud = new AttackDiagnosticsHud(
             () -> config.attackDiagnosticsEnabled);
     private final AttackDiagnostics attackDiagnostics = new AttackDiagnostics(
@@ -112,6 +114,9 @@ public final class YNYUtils implements SteinMod {
     @Override
     public void onOverlay(float partialTicks) {
         customReach.onFrame(partialTicks);
+        reachDebugOverlay.draw(customReach.isDebugVisible(), customReach.debugTarget(), customReach.debugContact(),
+                customReach.debugLimit(), customReach.debugSelected(), customReach.debugBlocked(),
+                customReach.debugBlockDistance());
     }
 
     @Override

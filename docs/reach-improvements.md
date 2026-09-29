@@ -67,6 +67,17 @@ daquele tick: não afirmamos que interações estendidas seguradas sejam contín
 Resolver isso integralmente pede um callback oficial após `getMouseOver` no tick,
 antes de consumir ataques/usos. Nenhuma API fictícia ou contorno foi adicionado.
 
+## Diagnóstico visual temporário
+
+Enquanto Custom Reach está ligado, quatro linhas no canto superior esquerdo mostram
+alvo na mira, distância dos olhos ao primeiro ponto de contato, limite configurado
+e se o resultado está selecionado. Se a entidade estiver além do slider, uma busca
+somente diagnóstica pode identificá-la até a distância vanilla de blocos (4,5 no
+survival) e marcá-la fora do limite. Um bloco que cruza a mira aparece como obstrução.
+Essa busca de leitura não muda o alvo usado pelo clique, o slider ou os packets.
+Ao desligar Custom Reach, o overlay some. A medição é até a caixa de colisão: ela
+não é a distância ao centro do aldeão e não comprova que o servidor aceitou um golpe.
+
 ## Diagnóstico de ataques (OFF por padrão)
 
 `SteinMod.onAttackEntity` captura dados imutáveis na thread do jogo, sem cancelar.

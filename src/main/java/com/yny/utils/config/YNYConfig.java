@@ -18,6 +18,7 @@ public final class YNYConfig {
 
     public volatile boolean knockbackEnabled = true;
     public volatile int knockbackPercent = 100;
+    public volatile int knockbackToggleKey;
 
     public static YNYConfig load() {
         File file = file();

@@ -1,0 +1,9 @@
+{
+  "id": "ynyutils",
+  "name": "YNYUtils",
+  "version": "0.1.0",
+  "author": "Artur",
+  "description": "Utilidades modulares client-side para Stein Loader.",
+  "entry": "com.yny.utils.YNYUtils",
+  "loader": "0.1.15"
+}

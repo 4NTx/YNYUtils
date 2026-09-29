@@ -1,0 +1,91 @@
+package com.yny.utils.modules.pvp;
+
+import java.util.function.BooleanSupplier;
+import java.util.function.IntSupplier;
+
+import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelInboundHandlerAdapter;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.network.NetHandlerPlayClient;
+import net.minecraft.network.NetworkManager;
+import net.minecraft.network.play.server.S12PacketEntityVelocity;
+
+/**
+ * Ajusta exclusivamente o S12 destinado ao jogador local antes de o manipulador
+ * vanilla aplicar os valores em Entity.motionX, Entity.motionY e Entity.motionZ.
+ */
+public final class KnockbackControl {
+
+    private static final String HANDLER_NAME = "ynyutils_knockback_control";
+
+    private final BooleanSupplier enabled;
+    private final IntSupplier percent;
+    private volatile int localPlayerId = Integer.MIN_VALUE;
+    private volatile Channel installedChannel;
+
+    public KnockbackControl(BooleanSupplier enabled, IntSupplier percent) {
+        this.enabled = enabled;
+        this.percent = percent;
+    }
+
+    /** Chamado no fim do tick para acompanhar conexões e mundos novos. */
+    public void ensureInstalled() {
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.thePlayer == null) {
+            localPlayerId = Integer.MIN_VALUE;
+            return;
+        }
+        localPlayerId = mc.thePlayer.getEntityId();
+
+        NetHandlerPlayClient handler = mc.getNetHandler();
+        if (handler == null) {
+            return;
+        }
+        NetworkManager network = handler.getNetworkManager();
+        Channel channel = network == null ? null : network.channel;
+        if (channel == null || channel == installedChannel) {
+            return;
+        }
+        try {
+            channel.pipeline().addBefore("packet_handler", HANDLER_NAME, new VelocityInterceptor(this));
+            installedChannel = channel;
+        } catch (Exception ignored) {
+            // A pipeline ainda pode estar sendo montada; o próximo tick tenta de novo.
+        }
+    }
+
+    private void adjust(S12PacketEntityVelocity packet) {
+        if (!enabled.getAsBoolean() || packet.getEntityID() != localPlayerId) {
+            return;
+        }
+        int value = Math.max(7, Math.min(100, percent.getAsInt()));
+        if (value == 100) {
+            return;
+        }
+        packet.motionX = scale(packet.motionX, value);
+        packet.motionY = scale(packet.motionY, value);
+        packet.motionZ = scale(packet.motionZ, value);
+    }
+
+    private static int scale(int motion, int percent) {
+        return Math.round(motion * (percent / 100.0F));
+    }
+
+    private static final class VelocityInterceptor extends ChannelInboundHandlerAdapter {
+
+        private final KnockbackControl control;
+
+        VelocityInterceptor(KnockbackControl control) {
+            this.control = control;
+        }
+
+        @Override
+        public void channelRead(ChannelHandlerContext context, Object message) throws Exception {
+            if (message instanceof S12PacketEntityVelocity) {
+                control.adjust((S12PacketEntityVelocity) message);
+            }
+            context.fireChannelRead(message);
+        }
+    }
+}

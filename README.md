@@ -68,7 +68,9 @@ Espinhos, Inquebrável e durabilidade. É possível definir um material preferid
 se não houver reserva dele, usa a melhor alternativa disponível. A opção
 `Ignorar armaduras sem encantamentos` restringe as reservas a peças encantadas.
 Na troca preventiva, exige mais durabilidade restante e não reduz os pontos base
-de armadura. A troca observa os slots locais e os callbacks oficiais do servidor;
+de armadura. Uma peça realmente quebrada no slot sempre tem prioridade sobre o
+limite preventivo; reservas danificadas, mas ainda utilizáveis, também podem ser
+equipadas. A troca observa os slots locais e os callbacks oficiais do servidor;
 se uma confirmação não chegar, libera a operação em até oito ticks e tenta de
 novo com intervalo progressivo, sem deixar o módulo preso por vários segundos. Se ativado,
 o descarte da peça antiga só ocorre depois dessa confirmação, somente quando ela

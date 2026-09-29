@@ -78,7 +78,9 @@ public final class AutoArmor {
         int threshold = Math.max(0, Math.min(50, preventiveThreshold.getAsInt()));
         for (int piece : PRIORITY) {
             ItemStack worn = asStack(Inventory.armor(piece));
-            if (worn != null && (threshold == 0 || durabilityPercent(worn) > threshold)) {
+            // A destroyed item must never be protected by the preventive threshold.
+            if (worn != null && !isBroken(worn)
+                    && (threshold == 0 || durabilityPercent(worn) > threshold)) {
                 continue;
             }
             if (tick < retryAt[piece]) {
@@ -269,7 +271,8 @@ public final class AutoArmor {
     private Choice bestReplacement(int piece, ItemStack worn, int threshold) {
         Choice best = null;
         int preference = Math.max(0, Math.min(PREFERRED_MATERIALS.length - 1, preferredMaterial.getAsInt()));
-        boolean preventive = worn != null && threshold > 0 && durabilityPercent(worn) <= threshold;
+        boolean preventive = worn != null && !isBroken(worn)
+                && threshold > 0 && durabilityPercent(worn) <= threshold;
         for (int slot = Inventory.HOTBAR_START; slot < Inventory.ARMOR_START; slot++) {
             ItemStack candidate = asStack(Inventory.stack(slot));
             if (candidate == null || Inventory.armorPiece(candidate) != piece || isBroken(candidate)) {

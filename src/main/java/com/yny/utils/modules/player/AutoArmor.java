@@ -34,6 +34,7 @@ public final class AutoArmor {
     private final IntSupplier preventiveThreshold;
     private final IntSupplier preferredMaterial;
     private final BooleanSupplier ignoreUnenchanted;
+    private final BooleanSupplier useDamagedReserves;
     private final BooleanSupplier dropUnenchantedOld;
     private final Consumer<String> status;
     private final long[] retryAt = new long[4];
@@ -43,11 +44,13 @@ public final class AutoArmor {
     private Pending pending;
 
     public AutoArmor(BooleanSupplier enabled, IntSupplier preventiveThreshold, IntSupplier preferredMaterial,
-            BooleanSupplier ignoreUnenchanted, BooleanSupplier dropUnenchantedOld, Consumer<String> status) {
+            BooleanSupplier ignoreUnenchanted, BooleanSupplier useDamagedReserves,
+            BooleanSupplier dropUnenchantedOld, Consumer<String> status) {
         this.enabled = enabled;
         this.preventiveThreshold = preventiveThreshold;
         this.preferredMaterial = preferredMaterial;
         this.ignoreUnenchanted = ignoreUnenchanted;
+        this.useDamagedReserves = useDamagedReserves;
         this.dropUnenchantedOld = dropUnenchantedOld;
         this.status = status;
     }
@@ -279,6 +282,11 @@ public final class AutoArmor {
                 continue;
             }
             if (ignoreUnenchanted.getAsBoolean() && !candidate.isItemEnchanted()) {
+                continue;
+            }
+            boolean emergencyReplacement = worn == null || isBroken(worn);
+            if (emergencyReplacement && !useDamagedReserves.getAsBoolean()
+                    && durabilityPercent(candidate) < 100) {
                 continue;
             }
             if (preventive && !isPreventiveUpgrade(candidate, worn)) {

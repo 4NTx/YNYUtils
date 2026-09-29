@@ -70,7 +70,10 @@ se não houver reserva dele, usa a melhor alternativa disponível. A opção
 Na troca preventiva, exige mais durabilidade restante e não reduz os pontos base
 de armadura. Uma peça realmente quebrada no slot sempre tem prioridade sobre o
 limite preventivo; reservas danificadas, mas ainda utilizáveis, também podem ser
-equipadas. A troca observa os slots locais e os callbacks oficiais do servidor;
+equipadas. `Usar reservas danificadas se a armadura quebrar` controla esse caso
+(ligado por padrão); desligado, nesses casos só aceita reservas com 100% de
+durabilidade. Itens literalmente destruídos não são equipáveis no Minecraft.
+A troca observa os slots locais e os callbacks oficiais do servidor;
 se uma confirmação não chegar, libera a operação em até dois ticks e tenta de
 novo com intervalo progressivo, sem deixar o módulo preso por vários segundos. Se ativado,
 o descarte da peça antiga só ocorre depois que uma reserva válida foi equipada e

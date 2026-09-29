@@ -36,6 +36,7 @@ public final class YNYUtils implements SteinMod {
     private final AutoArmor autoArmor = new AutoArmor(() -> config.autoArmorEnabled,
             () -> config.autoArmorPreventiveThreshold, () -> config.autoArmorPreferredMaterial,
             () -> config.autoArmorIgnoreUnenchanted,
+            () -> config.autoArmorUseDamagedReserves,
             () -> config.autoArmorDropUnenchantedOld, pvpStatusHud::showAutoArmorStatus);
     private final AttackDiagnosticsHud attackDiagnosticsHud = new AttackDiagnosticsHud(
             () -> config.attackDiagnosticsEnabled);
@@ -151,6 +152,11 @@ public final class YNYUtils implements SteinMod {
                 .option(Option.toggle("Ignorar reservas sem encantamentos", () -> config.autoArmorIgnoreUnenchanted,
                         value -> {
                             config.autoArmorIgnoreUnenchanted = value;
+                            markConfigChanged();
+                        }))
+                .option(Option.toggle("Usar reservas danificadas se a armadura quebrar",
+                        () -> config.autoArmorUseDamagedReserves, value -> {
+                            config.autoArmorUseDamagedReserves = value;
                             markConfigChanged();
                         }))
                 .option(Option.toggle("Descartar antiga sem encantamentos após troca confirmada",

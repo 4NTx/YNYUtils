@@ -19,6 +19,7 @@ public final class YNYConfig {
     public volatile boolean knockbackEnabled = true;
     public volatile int knockbackPercent = 100;
     public volatile int knockbackToggleKey;
+    public volatile boolean knockbackStatusHudEnabled = true;
     public volatile boolean reachDebugEnabled;
     public volatile double reachDebugReach = 3.0D;
     public volatile boolean customReachEnabled;

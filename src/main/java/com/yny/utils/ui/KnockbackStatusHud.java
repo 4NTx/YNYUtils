@@ -1,5 +1,7 @@
 package com.yny.utils.ui;
 
+import java.util.function.BooleanSupplier;
+
 import dev.xavier.stein.loader.api.HudElement;
 import dev.xavier.stein.loader.api.HudPlacement;
 import net.minecraft.client.Minecraft;
@@ -12,9 +14,14 @@ public final class KnockbackStatusHud implements HudElement {
     private static final String ENABLED_MESSAGE = "Knockback: ATIVADO";
     private static final String DISABLED_MESSAGE = "Knockback: DESATIVADO";
 
+    private final BooleanSupplier enabled;
     private String message = ENABLED_MESSAGE;
     private int color = 0x55FF55;
     private long visibleUntil;
+
+    public KnockbackStatusHud(BooleanSupplier enabled) {
+        this.enabled = enabled;
+    }
 
     /** Mostra a mudança de estado por um curto período. */
     public void show(boolean enabled) {
@@ -35,7 +42,7 @@ public final class KnockbackStatusHud implements HudElement {
 
     @Override
     public boolean layout(boolean preview, float partialTicks) {
-        return preview || System.nanoTime() < visibleUntil;
+        return preview || enabled.getAsBoolean() && System.nanoTime() < visibleUntil;
     }
 
     @Override

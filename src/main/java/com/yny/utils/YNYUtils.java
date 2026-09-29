@@ -25,7 +25,8 @@ public final class YNYUtils implements SteinMod {
             () -> config.customReachEnabled, () -> config.customReachDistance);
     private final ReachDebug reachDebug = new ReachDebug(
             () -> config.reachDebugEnabled, () -> config.reachDebugReach);
-    private final KnockbackStatusHud knockbackStatusHud = new KnockbackStatusHud();
+    private final KnockbackStatusHud knockbackStatusHud = new KnockbackStatusHud(
+            () -> config.knockbackStatusHudEnabled);
     private boolean toggleKeyWasDown;
     private boolean configDirty;
     private int configSaveDelay;
@@ -65,6 +66,10 @@ public final class YNYUtils implements SteinMod {
                 }, value -> (int) value + "% (redução: " + (100 - (int) value) + "%)"))
                 .option(Option.key("Tecla para alternar", () -> config.knockbackToggleKey, value -> {
                     config.knockbackToggleKey = value;
+                    markConfigChanged();
+                }))
+                .option(Option.toggle("Mostrar notificação do KB", () -> config.knockbackStatusHudEnabled, value -> {
+                    config.knockbackStatusHudEnabled = value;
                     markConfigChanged();
                 }))
                 .section("Diagnóstico")

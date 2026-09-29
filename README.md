@@ -20,6 +20,7 @@ após a última alteração.
 
 Ao ativar ou desativar o Knockback Control, uma notificação temporária aparece.
 Ela pode ser movida, escalada ou ocultada pelo editor de HUD do Stein Loader.
+Ela também pode ser ligada ou desligada em `Mostrar notificação do KB` no Panel.
 
 ## Reach Debug
 

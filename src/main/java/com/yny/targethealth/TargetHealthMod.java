@@ -18,7 +18,6 @@ public final class TargetHealthMod {
 
     public static void addOptions(Page page) {
         page.section("YNY Damage Indicator")
-            .section("Exibição")
             .option(Option.toggle("Ativar indicador", () -> settings.enabled, value -> {
                 settings.enabled = value;
                 Settings.save(settings);
@@ -35,7 +34,6 @@ public final class TargetHealthMod {
                 settings.showAbsorption = value;
                 Settings.save(settings);
             }))
-            .section("Alvos")
             .option(Option.toggle("Mostrar alvos distantes", () -> settings.showDistantTargets, value -> {
                 settings.showDistantTargets = value;
                 Settings.save(settings);
@@ -48,7 +46,6 @@ public final class TargetHealthMod {
                 settings.ignoreLeaves = value;
                 Settings.save(settings);
             }))
-            .section("Aparência")
             .option(Option.cycle("Estilo da HUD", TEMPLATES, () -> settings.templateIndex, value -> {
                 settings.templateIndex = value;
                 Settings.save(settings);

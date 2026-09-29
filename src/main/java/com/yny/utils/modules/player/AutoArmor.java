@@ -21,14 +21,14 @@ public final class AutoArmor {
         null, ArmorMaterial.DIAMOND, ArmorMaterial.IRON, ArmorMaterial.CHAIN,
         ArmorMaterial.GOLD, ArmorMaterial.LEATHER
     };
-    private static final long FIRST_RETRY_TICKS = 2L;
-    private static final long SECOND_RETRY_TICKS = 10L;
-    private static final long LATER_RETRY_TICKS = 20L;
+    private static final long FIRST_RETRY_TICKS = 1L;
+    private static final long SECOND_RETRY_TICKS = 3L;
+    private static final long LATER_RETRY_TICKS = 10L;
     private static final long NO_ITEM_RECHECK_TICKS = 4L;
     private static final long CLICK_DELAY_TICKS = 1L;
     // A normal window click should be reflected locally/server-side in a few ticks.
     // Never leave the utility blocked for seconds if the SDK callback is missed.
-    private static final long SERVER_WAIT_TIMEOUT_TICKS = 8L;
+    private static final long SERVER_WAIT_TIMEOUT_TICKS = 2L;
 
     private final BooleanSupplier enabled;
     private final IntSupplier preventiveThreshold;
@@ -105,6 +105,9 @@ public final class AutoArmor {
             pending = null;
             scheduleRetry(piece);
             status.accept("Auto Armor: troca não iniciada");
+        } else {
+            observeCurrentInventory();
+            advancePending();
         }
     }
 
@@ -127,7 +130,7 @@ public final class AutoArmor {
         int inventoryIndex = Inventory.inventoryIndexOf(slot);
         if (pending.dropping) {
             if (inventoryIndex == pending.sourceIndex && stack == null) {
-                pending.confirmed = true;
+                pending.serverConfirmed = true;
             }
             return;
         }
@@ -149,7 +152,7 @@ public final class AutoArmor {
         }
         if (pending.dropping) {
             if (Inventory.stack(pending.sourceIndex) == null) {
-                pending.confirmed = true;
+                pending.serverConfirmed = true;
             } else {
                 pending.rejected = true;
             }
@@ -162,7 +165,7 @@ public final class AutoArmor {
         if (matchesExpected(pending.source, pending.expectedSource)
                 && matchesExpected(pending.armor, pending.expectedArmor)
                 && Inventory.cursor() == null) {
-            pending.confirmed = true;
+            pending.serverConfirmed = true;
         } else {
             pending.rejected = true;
         }
@@ -181,9 +184,6 @@ public final class AutoArmor {
     /** Poll local slots as well as callbacks; some Stein builds omit a callback on a normal click. */
     private void observeCurrentInventory() {
         if (pending.dropping) {
-            if (Inventory.cursor() == null && Inventory.stack(pending.sourceIndex) == null) {
-                pending.confirmed = true;
-            }
             return;
         }
         ItemStack source = asStack(Inventory.stack(pending.sourceIndex));
@@ -191,7 +191,7 @@ public final class AutoArmor {
         if (Inventory.cursor() == null
                 && matchesExpected(source, pending.expectedSource)
                 && matchesExpected(armor, pending.expectedArmor)) {
-            pending.confirmed = true;
+            pending.localApplied = true;
         }
     }
 
@@ -200,7 +200,7 @@ public final class AutoArmor {
                 && matchesExpected(pending.source, pending.expectedSource)
                 && matchesExpected(pending.armor, pending.expectedArmor)) {
             // Source + armor slot updates are emitted after the server accepted all clicks.
-            pending.confirmed = true;
+            pending.serverConfirmed = true;
         }
     }
 
@@ -211,32 +211,37 @@ public final class AutoArmor {
             }
             return;
         }
-        if (pending.confirmed) {
-            if (pending.dropping) {
-                status.accept("Auto Armor: peça antiga descartada");
-                pending = null;
-                return;
-            }
+        if (pending.dropping && pending.serverConfirmed) {
+            status.accept("Auto Armor: peça antiga descartada");
+            pending = null;
+            return;
+        }
+        if (pending.localApplied && (!pending.dropOld || pending.serverConfirmed)) {
             failedAttempts[pending.piece] = 0;
             if (pending.dropOld && enabled.getAsBoolean()
                     && matchesExpected(asStack(Inventory.stack(pending.sourceIndex)), pending.oldArmor)
                     && Inventory.cursor() == null) {
                 pending.dropping = true;
-                pending.confirmed = false;
+                pending.serverConfirmed = false;
                 pending.sourceSeen = false;
                 if (Inventory.drop(pending.sourceIndex, true)) {
                     return;
                 }
                 pending.dropping = false;
             }
-            status.accept("Auto Armor: " + pieceName(pending.piece) + " confirmada pelo servidor");
+            status.accept("Auto Armor: " + pieceName(pending.piece) + " equipada");
             pending = null;
             return;
         }
 
         pending.age++;
         if (pending.age >= SERVER_WAIT_TIMEOUT_TICKS && Inventory.cursor() == null) {
-            scheduleRetry(pending.piece);
+            if (pending.localApplied) {
+                // Keep the old item and stop waiting if only the optional server ack is missing.
+                failedAttempts[pending.piece] = 0;
+            } else {
+                scheduleRetry(pending.piece);
+            }
             pending = null;
         }
     }
@@ -391,7 +396,8 @@ public final class AutoArmor {
         ItemStack armor;
         boolean sourceSeen;
         boolean armorSeen;
-        boolean confirmed;
+        boolean localApplied;
+        boolean serverConfirmed;
         boolean rejected;
         boolean dropping;
         int age;

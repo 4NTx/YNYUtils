@@ -1,6 +1,7 @@
 package com.yny.targethealth;
 
 import java.util.List;
+import java.util.Locale;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -219,7 +220,12 @@ public final class TargetHealthElement implements HudElement {
         Gui.drawRect(x, 0, x + WIDTH, HEIGHT, backgroundColor());
         Gui.drawRect(x, 0, x + WIDTH, 1, 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor));
         if (TargetHealthMod.settings.showName) {
-            font.drawStringWithShadow(name, x + 3, 4, 0xFFFFFF);
+            int nameWidth = WIDTH - 6;
+            if (TargetHealthMod.settings.showNumbers) {
+                nameWidth -= font.getStringWidth(healthText) + 5;
+            }
+            String clippedName = font.trimStringToWidth(name, Math.max(0, nameWidth));
+            font.drawStringWithShadow(clippedName, x + 3, 4, 0xFFFFFF);
         }
 
         int barX = x + 3;
@@ -239,7 +245,8 @@ public final class TargetHealthElement implements HudElement {
     }
 
     private static String format(float value) {
-        return value == Math.round(value) ? Integer.toString(Math.round(value)) : String.format("%.1f", value);
+        return value == Math.round(value) ? Integer.toString(Math.round(value))
+                : String.format(Locale.ROOT, "%.1f", value);
     }
 
     private static int healthColor(float percent) {
@@ -276,7 +283,9 @@ public final class TargetHealthElement implements HudElement {
         String value = healthText;
         int valueWidth = font.getStringWidth(value);
         if (TargetHealthMod.settings.showName) {
-            font.drawStringWithShadow(font.trimStringToWidth(name, width - valueWidth - 8), x + 3, 4, 0xFFFFFF);
+            int reservedWidth = TargetHealthMod.settings.showNumbers ? valueWidth + 8 : 6;
+            font.drawStringWithShadow(font.trimStringToWidth(name, Math.max(0, width - reservedWidth)),
+                    x + 3, 4, 0xFFFFFF);
         }
         if (TargetHealthMod.settings.showNumbers) {
             font.drawStringWithShadow(value, x + width - valueWidth - 3, 4, barColor(health / maximum));

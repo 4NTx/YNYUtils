@@ -21,6 +21,8 @@ public final class YNYConfig {
     public volatile int knockbackToggleKey;
     public volatile boolean reachDebugEnabled;
     public volatile double reachDebugReach = 3.0D;
+    public volatile boolean customReachEnabled;
+    public volatile double customReachDistance = 3.0D;
 
     public static YNYConfig load() {
         File file = file();
@@ -37,6 +39,10 @@ public final class YNYConfig {
                 config.reachDebugReach = 3.0D;
             }
             config.reachDebugReach = Math.max(3.0D, Math.min(3.9D, config.reachDebugReach));
+            if (Double.isNaN(config.customReachDistance)) {
+                config.customReachDistance = 3.0D;
+            }
+            config.customReachDistance = Math.max(3.0D, Math.min(3.9D, config.customReachDistance));
             return config;
         } catch (Exception ignored) {
             return new YNYConfig();

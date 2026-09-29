@@ -2,6 +2,7 @@ package com.yny.utils;
 
 import com.yny.utils.config.YNYConfig;
 import com.yny.utils.modules.pvp.KnockbackControl;
+import com.yny.utils.modules.pvp.CustomReach;
 import com.yny.utils.modules.pvp.ReachDebug;
 import com.yny.utils.ui.KnockbackStatusHud;
 
@@ -20,6 +21,8 @@ public final class YNYUtils implements SteinMod {
     private static volatile YNYConfig config = new YNYConfig();
     private final KnockbackControl knockbackControl = new KnockbackControl(
             () -> config.knockbackEnabled, () -> config.knockbackPercent);
+    private final CustomReach customReach = new CustomReach(
+            () -> config.customReachEnabled, () -> config.customReachDistance);
     private final ReachDebug reachDebug = new ReachDebug(
             () -> config.reachDebugEnabled, () -> config.reachDebugReach);
     private final KnockbackStatusHud knockbackStatusHud = new KnockbackStatusHud();
@@ -73,11 +76,22 @@ public final class YNYUtils implements SteinMod {
                         () -> config.reachDebugReach, value -> {
                             config.reachDebugReach = value;
                             markConfigChanged();
+                        }, value -> String.format("%.1f blocos", value)))
+                .section("Custom Reach")
+                .option(Option.toggle("Custom Reach", () -> config.customReachEnabled, value -> {
+                    config.customReachEnabled = value;
+                    markConfigChanged();
+                }))
+                .option(Option.slider("Alcance", CustomReach.VANILLA_REACH, CustomReach.MAX_REACH, 0.1,
+                        () -> config.customReachDistance, value -> {
+                            config.customReachDistance = value;
+                            markConfigChanged();
                         }, value -> String.format("%.1f blocos", value)));
     }
 
     @Override
     public void onOverlay(float partialTicks) {
+        customReach.apply();
         reachDebug.draw();
     }
 

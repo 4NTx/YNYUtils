@@ -27,6 +27,14 @@ Ferramenta somente de diagnóstico. Quando ativada, mostra no HUD o alvo que o
 Minecraft já está apontando, a distância até a hitbox, o alcance vanilla atual e
 o alcance configurado para diagnóstico (3,0 a 3,9 blocos). Ela não modifica
 raycast, alcance, hitbox, ataque, pacotes ou posições.
+
+## Custom Reach
+
+Quando ligado, substitui apenas a seleção local de uma entidade na linha da
+mira, entre 3,0 e 3,9 blocos. O alvo precisa estar antes de qualquer bloco; o
+clique e a interação continuam usando os métodos vanilla e o servidor continua
+responsável por validar o alcance. Não altera hitboxes, movimento, velocity ou
+pacotes de movimento.
 O relatório técnico está em
 [`docs/knockback-control-compatibility.md`](docs/knockback-control-compatibility.md).
 

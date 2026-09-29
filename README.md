@@ -17,6 +17,13 @@ redução correspondente.
 O interceptor é instalado uma vez por conexão, ao entrar no mundo. Mudanças
 seguidas de configuração ou keybind são agrupadas e gravadas uma vez, um segundo
 após a última alteração.
+
+## Reach Debug
+
+Ferramenta somente de diagnóstico. Quando ativada, mostra no HUD o alvo que o
+Minecraft já está apontando, a distância até a hitbox, o alcance vanilla atual e
+o alcance configurado para diagnóstico (3,0 a 3,9 blocos). Ela não modifica
+raycast, alcance, hitbox, ataque, pacotes ou posições.
 O relatório técnico está em
 [`docs/knockback-control-compatibility.md`](docs/knockback-control-compatibility.md).
 

@@ -2,6 +2,7 @@ package com.yny.utils;
 
 import com.yny.utils.config.YNYConfig;
 import com.yny.utils.modules.pvp.KnockbackControl;
+import com.yny.utils.modules.pvp.ReachDebug;
 
 import dev.xavier.stein.loader.api.Option;
 import dev.xavier.stein.loader.api.Page;
@@ -17,6 +18,8 @@ public final class YNYUtils implements SteinMod {
     private static volatile YNYConfig config = new YNYConfig();
     private final KnockbackControl knockbackControl = new KnockbackControl(
             () -> config.knockbackEnabled, () -> config.knockbackPercent);
+    private final ReachDebug reachDebug = new ReachDebug(
+            () -> config.reachDebugEnabled, () -> config.reachDebugReach);
     private boolean toggleKeyWasDown;
     private boolean configDirty;
     private int configSaveDelay;
@@ -29,6 +32,7 @@ public final class YNYUtils implements SteinMod {
     @Override
     public void onTickEnd() {
         knockbackControl.installIfPending();
+        reachDebug.update();
         updateToggleKey();
         saveConfigIfDue();
     }
@@ -54,7 +58,22 @@ public final class YNYUtils implements SteinMod {
                 .option(Option.key("Tecla para alternar", () -> config.knockbackToggleKey, value -> {
                     config.knockbackToggleKey = value;
                     markConfigChanged();
-                }));
+                }))
+                .section("Diagnóstico")
+                .option(Option.toggle("Reach Debug", () -> config.reachDebugEnabled, value -> {
+                    config.reachDebugEnabled = value;
+                    markConfigChanged();
+                }))
+                .option(Option.slider("Alcance de diagnóstico", ReachDebug.VANILLA_REACH, ReachDebug.MAX_REACH, 0.1,
+                        () -> config.reachDebugReach, value -> {
+                            config.reachDebugReach = value;
+                            markConfigChanged();
+                        }, value -> String.format("%.1f blocos", value)));
+    }
+
+    @Override
+    public void onOverlay(float partialTicks) {
+        reachDebug.draw();
     }
 
     private void updateToggleKey() {

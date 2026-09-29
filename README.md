@@ -55,9 +55,12 @@ uma troca preventiva por uma peça de qualidade inferior.
 
 A escolha compara pontos de armadura, Proteção e encantamentos especializados,
 Espinhos, Inquebrável e durabilidade. É possível definir um material preferido;
-se não houver reserva dele, usa a melhor alternativa disponível. A troca espera
-as atualizações oficiais dos slots vindas do servidor antes de ser considerada
-concluída e nunca inicia outra enquanto a anterior estiver pendente. Se ativado,
+se não houver reserva dele, usa a melhor alternativa disponível. A opção
+`Ignorar armaduras sem encantamentos` restringe as reservas a peças encantadas.
+Na troca preventiva, exige mais durabilidade restante e não reduz os pontos base
+de armadura. A troca observa os slots locais e os callbacks oficiais do servidor;
+se uma confirmação não chegar, libera a operação em até oito ticks e tenta de
+novo com intervalo progressivo, sem deixar o módulo preso por vários segundos. Se ativado,
 o descarte da peça antiga só ocorre depois dessa confirmação, somente quando ela
 não possui encantamentos e só com cursor vazio; por padrão o descarte está OFF.
 Peças encantadas antigas são sempre preservadas.

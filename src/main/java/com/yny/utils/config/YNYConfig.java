@@ -33,6 +33,7 @@ public final class YNYConfig {
     public volatile int autoArmorPreventiveThreshold;
     /** 0 = melhor disponível; 1..5 = diamante, ferro, malha, ouro, couro. */
     public volatile int autoArmorPreferredMaterial;
+    public volatile boolean autoArmorIgnoreUnenchanted;
     public volatile boolean autoArmorDropUnenchantedOld;
 
     public static YNYConfig load() {

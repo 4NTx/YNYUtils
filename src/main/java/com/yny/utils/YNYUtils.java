@@ -33,6 +33,7 @@ public final class YNYUtils implements SteinMod {
     private final ToggleKey autoArmorToggleKey = new ToggleKey();
     private final AutoArmor autoArmor = new AutoArmor(() -> config.autoArmorEnabled,
             () -> config.autoArmorPreventiveThreshold, () -> config.autoArmorPreferredMaterial,
+            () -> config.autoArmorIgnoreUnenchanted,
             () -> config.autoArmorDropUnenchantedOld, pvpStatusHud::showAutoArmorStatus);
     private final AttackDiagnosticsHud attackDiagnosticsHud = new AttackDiagnosticsHud(
             () -> config.attackDiagnosticsEnabled);
@@ -141,6 +142,11 @@ public final class YNYUtils implements SteinMod {
                             config.autoArmorPreventiveThreshold = (int) value;
                             markConfigChanged();
                         }, value -> (int) value == 0 ? "Só quando quebrar" : (int) value + "% restante"))
+                .option(Option.toggle("Ignorar armaduras sem encantamentos", () -> config.autoArmorIgnoreUnenchanted,
+                        value -> {
+                            config.autoArmorIgnoreUnenchanted = value;
+                            markConfigChanged();
+                        }))
                 .option(Option.toggle("Descartar peça antiga sem encantamentos",
                         () -> config.autoArmorDropUnenchantedOld, value -> {
                             config.autoArmorDropUnenchantedOld = value;

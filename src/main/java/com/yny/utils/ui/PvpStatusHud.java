@@ -22,6 +22,13 @@ public final class PvpStatusHud implements HudElement {
     private int color = 0x55FF55;
     private long visibleUntil;
     private boolean reachMessage;
+    private FontRenderer measuredFont;
+    private boolean measuredUnicode;
+    private int measuredWidth;
+
+    public void invalidateFontMetrics() {
+        measuredFont = null;
+    }
 
     public PvpStatusHud(BooleanSupplier knockbackNotificationsEnabled, BooleanSupplier reachNotificationsEnabled) {
         this.knockbackNotificationsEnabled = knockbackNotificationsEnabled;
@@ -64,8 +71,13 @@ public final class PvpStatusHud implements HudElement {
     @Override
     public int width() {
         FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
-        return Math.max(font.getStringWidth(WIDEST_MESSAGE),
-                Math.max(font.getStringWidth(KB_ENABLED), font.getStringWidth(KB_DISABLED)));
+        if (font != measuredFont || font.getUnicodeFlag() != measuredUnicode) {
+            measuredWidth = Math.max(font.getStringWidth(WIDEST_MESSAGE),
+                    Math.max(font.getStringWidth(KB_ENABLED), font.getStringWidth(KB_DISABLED)));
+            measuredFont = font;
+            measuredUnicode = font.getUnicodeFlag();
+        }
+        return measuredWidth;
     }
 
     @Override

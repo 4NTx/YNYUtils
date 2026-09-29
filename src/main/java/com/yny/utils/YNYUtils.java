@@ -2,9 +2,12 @@ package com.yny.utils;
 
 import com.yny.utils.config.YNYConfig;
 import com.yny.utils.core.ToggleKey;
+import com.yny.utils.modules.pvp.AttackDiagnostics;
 import com.yny.utils.modules.pvp.KnockbackControl;
 import com.yny.utils.modules.pvp.CustomReach;
 import com.yny.utils.ui.PvpStatusHud;
+import com.yny.utils.ui.AttackDiagnosticsHud;
+import net.minecraft.entity.Entity;
 
 import dev.xavier.stein.loader.api.Hud;
 import dev.xavier.stein.loader.api.Option;
@@ -25,6 +28,10 @@ public final class YNYUtils implements SteinMod {
             () -> config.knockbackStatusHudEnabled, () -> config.customReachStatusHudEnabled);
     private final ToggleKey knockbackToggleKey = new ToggleKey();
     private final ToggleKey customReachToggleKey = new ToggleKey();
+    private final AttackDiagnosticsHud attackDiagnosticsHud = new AttackDiagnosticsHud(
+            () -> config.attackDiagnosticsEnabled);
+    private final AttackDiagnostics attackDiagnostics = new AttackDiagnostics(
+            () -> config.attackDiagnosticsEnabled, customReach::effectiveReach, attackDiagnosticsHud);
     private boolean configDirty;
     private int configSaveDelay;
 
@@ -32,18 +39,23 @@ public final class YNYUtils implements SteinMod {
     public void afterStartGame() {
         config = YNYConfig.load();
         Hud.register(pvpStatusHud);
+        Hud.register(attackDiagnosticsHud);
     }
 
     @Override
     public void onTickEnd() {
         knockbackControl.installIfPending();
         updateToggleKey();
+        customReach.onTickEnd();
+        attackDiagnostics.onTickEnd();
         saveConfigIfDue();
     }
 
     @Override
     public void onJoinGame() {
         knockbackControl.requestInstallation();
+        customReach.configurationChanged();
+        attackDiagnostics.reset();
     }
 
     @Override
@@ -71,12 +83,14 @@ public final class YNYUtils implements SteinMod {
                 .section("Custom Reach")
                 .option(Option.toggle("Custom Reach", () -> config.customReachEnabled, value -> {
                     config.customReachEnabled = value;
+                    customReach.configurationChanged();
                     pvpStatusHud.showReach(value, config.customReachDistance);
                     markConfigChanged();
                 }))
                 .option(Option.slider("Alcance", CustomReach.VANILLA_REACH, CustomReach.MAX_REACH, 0.1,
                         () -> config.customReachDistance, value -> {
                             config.customReachDistance = value;
+                            customReach.configurationChanged();
                             markConfigChanged();
                         }, value -> String.format("%.1f blocos", value)))
                 .option(Option.key("Tecla para alternar Reach", () -> config.customReachToggleKey, value -> {
@@ -86,12 +100,57 @@ public final class YNYUtils implements SteinMod {
                 .option(Option.toggle("Mostrar notificação do Reach", () -> config.customReachStatusHudEnabled, value -> {
                     config.customReachStatusHudEnabled = value;
                     markConfigChanged();
+                }))
+                .option(Option.toggle("Diagnóstico de ataques", () -> config.attackDiagnosticsEnabled, value -> {
+                    config.attackDiagnosticsEnabled = value;
+                    attackDiagnostics.reset();
+                    attackDiagnostics.onTickEnd();
+                    markConfigChanged();
                 }));
     }
 
     @Override
     public void onOverlay(float partialTicks) {
-        customReach.apply();
+        customReach.onFrame(partialTicks);
+    }
+
+    @Override
+    public void onModelsReloaded() {
+        pvpStatusHud.invalidateFontMetrics();
+    }
+
+    @Override
+    public void onMouseInput() {
+        customReach.onInput();
+    }
+
+    @Override
+    public void onKeyInput() {
+        customReach.onInput();
+    }
+
+    @Override
+    public boolean onAttackEntity(Object target) {
+        if (target instanceof Entity) {
+            attackDiagnostics.onAttack((Entity) target);
+        }
+        return false;
+    }
+
+    @Override
+    public boolean onEntityHurt(Object entity) {
+        if (entity instanceof Entity) {
+            attackDiagnostics.observeDamage((Entity) entity);
+        }
+        return false;
+    }
+
+    @Override
+    public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
+            float newAbsorption) {
+        if (entity instanceof Entity && oldHealth + oldAbsorption > newHealth + newAbsorption) {
+            attackDiagnostics.observeDamage((Entity) entity);
+        }
     }
 
     private void updateToggleKey() {
@@ -106,6 +165,7 @@ public final class YNYUtils implements SteinMod {
     private void updateCustomReachToggleKey() {
         if (customReachToggleKey.wasPressed(config.customReachToggleKey)) {
             config.customReachEnabled = !config.customReachEnabled;
+            customReach.configurationChanged();
             pvpStatusHud.showReach(config.customReachEnabled, config.customReachDistance);
             markConfigChanged();
         }

@@ -29,6 +29,20 @@ mira, entre 3,0 e 3,9 blocos. O alvo precisa estar antes de qualquer bloco; o
 clique e a interação continuam usando os métodos vanilla e o servidor continua
 responsável por validar o alcance. Não altera hitboxes, movimento, velocity ou
 pacotes de movimento.
+
+OFF e ON com 3,0 não executam raycast adicional nem substituem a seleção vanilla.
+Ao desligar/reduzir para 3,0, a seleção anterior é restaurada imediatamente, somente
+se ainda pertencer ao YNYUtils. No criativo, preserva o alcance vanilla de 6 blocos.
+Cliques de mouse ou teclas remapeadas sincronizam a seleção com o tick do jogo;
+a prévia usa o partialTicks do quadro. Reutiliza resultados vanilla e evita
+consultas repetidas dentro da mesma fase de input.
+
+`Diagnóstico de ataques` é opcional (padrão OFF) e usa um HUD próprio do Stein.
+Mostra alvo, distância dos olhos até o contato, limite e escrita local do pacote
+de ataque. Dano observado não confirma autoria nem aceitação do servidor.
+Não é o antigo Reach Debug: nada é desenhado continuamente ao apontar um alvo.
+
+Detalhes, limitações e testes: [`docs/reach-improvements.md`](docs/reach-improvements.md).
 O relatório técnico está em
 [`docs/knockback-control-compatibility.md`](docs/knockback-control-compatibility.md).
 
@@ -39,3 +53,6 @@ Requer JDK 25 e o Stein SDK preparado para Minecraft 1.8.9:
 ```powershell
 java -jar ..\stein-sdk-tool\stein-sdk.jar build
 ```
+
+Regressões headless, depois do build: `powershell -File tests\run.ps1`.
+Os dublês de teste não são incluídos no `.steinmod`.

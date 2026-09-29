@@ -3,7 +3,9 @@ package com.yny.utils;
 import com.yny.utils.config.YNYConfig;
 import com.yny.utils.modules.pvp.KnockbackControl;
 import com.yny.utils.modules.pvp.ReachDebug;
+import com.yny.utils.ui.KnockbackStatusHud;
 
+import dev.xavier.stein.loader.api.Hud;
 import dev.xavier.stein.loader.api.Option;
 import dev.xavier.stein.loader.api.Page;
 import dev.xavier.stein.loader.api.SteinMod;
@@ -20,6 +22,7 @@ public final class YNYUtils implements SteinMod {
             () -> config.knockbackEnabled, () -> config.knockbackPercent);
     private final ReachDebug reachDebug = new ReachDebug(
             () -> config.reachDebugEnabled, () -> config.reachDebugReach);
+    private final KnockbackStatusHud knockbackStatusHud = new KnockbackStatusHud();
     private boolean toggleKeyWasDown;
     private boolean configDirty;
     private int configSaveDelay;
@@ -27,6 +30,7 @@ public final class YNYUtils implements SteinMod {
     @Override
     public void afterStartGame() {
         config = YNYConfig.load();
+        Hud.register(knockbackStatusHud);
     }
 
     @Override
@@ -49,6 +53,7 @@ public final class YNYUtils implements SteinMod {
                 .section("PvP")
                 .option(Option.toggle("Ativar Knockback Control", () -> config.knockbackEnabled, value -> {
                     config.knockbackEnabled = value;
+                    knockbackStatusHud.show(value);
                     markConfigChanged();
                 }))
                 .option(Option.slider("Velocidade recebida", 93, 100, 1, () -> config.knockbackPercent, value -> {
@@ -82,6 +87,7 @@ public final class YNYUtils implements SteinMod {
                 && Keyboard.isKeyDown(key);
         if (down && !toggleKeyWasDown) {
             config.knockbackEnabled = !config.knockbackEnabled;
+            knockbackStatusHud.show(config.knockbackEnabled);
             markConfigChanged();
         }
         toggleKeyWasDown = down;

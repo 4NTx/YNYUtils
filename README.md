@@ -18,6 +18,9 @@ O interceptor é instalado uma vez por conexão, ao entrar no mundo. Mudanças
 seguidas de configuração ou keybind são agrupadas e gravadas uma vez, um segundo
 após a última alteração.
 
+Ao ativar ou desativar o Knockback Control, uma notificação temporária aparece.
+Ela pode ser movida, escalada ou ocultada pelo editor de HUD do Stein Loader.
+
 ## Reach Debug
 
 Ferramenta somente de diagnóstico. Quando ativada, mostra no HUD o alvo que o

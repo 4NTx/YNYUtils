@@ -48,11 +48,13 @@ O relatório técnico está em
 
 ## Auto Armor
 
-Reequipa peças que ficaram vazias usando armaduras compatíveis da bolsa/hotbar.
+Permanece ativado até você desligar, inclusive se acabar o estoque: volta a equipar
+quando uma peça quebra e surge uma reserva compatível na bolsa/hotbar.
 Prioriza maior proteção e, em empate, melhor durabilidade. Usa a API de inventário
 do Stein, sem abrir telas nem mexer nos controles de movimento. Faz no máximo uma
 troca a cada dois ticks e espera antes de tentar de novo se a confirmação demorar.
-Desativado por padrão; configuração, tecla e notificação ficam no Panel.
+Desativado por padrão; o botão `Ligar/desligar Auto Armor`, a tecla selecionável e
+a notificação ficam no Panel/HUD do Stein. A preferência é salva na configuração.
 
 ## Compilação
 

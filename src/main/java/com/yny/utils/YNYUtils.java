@@ -113,7 +113,7 @@ public final class YNYUtils implements SteinMod {
                     markConfigChanged();
                 }))
                 .section("Auto Armor")
-                .option(Option.toggle("Auto Armor", () -> config.autoArmorEnabled, value -> {
+                .option(Option.toggle("Ligar/desligar Auto Armor", () -> config.autoArmorEnabled, value -> {
                     config.autoArmorEnabled = value;
                     pvpStatusHud.showAutoArmor(value);
                     markConfigChanged();

@@ -148,12 +148,12 @@ public final class YNYUtils implements SteinMod {
                             config.autoArmorPreventiveThreshold = (int) value;
                             markConfigChanged();
                         }, value -> (int) value == 0 ? "Só quando quebrar" : (int) value + "% restante"))
-                .option(Option.toggle("Ignorar armaduras sem encantamentos", () -> config.autoArmorIgnoreUnenchanted,
+                .option(Option.toggle("Ignorar reservas sem encantamentos", () -> config.autoArmorIgnoreUnenchanted,
                         value -> {
                             config.autoArmorIgnoreUnenchanted = value;
                             markConfigChanged();
                         }))
-                .option(Option.toggle("Descartar peça antiga sem encantamentos",
+                .option(Option.toggle("Descartar antiga sem encantamentos após troca confirmada",
                         () -> config.autoArmorDropUnenchantedOld, value -> {
                             config.autoArmorDropUnenchantedOld = value;
                             markConfigChanged();

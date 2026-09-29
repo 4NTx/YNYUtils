@@ -71,11 +71,12 @@ Na troca preventiva, exige mais durabilidade restante e não reduz os pontos bas
 de armadura. Uma peça realmente quebrada no slot sempre tem prioridade sobre o
 limite preventivo; reservas danificadas, mas ainda utilizáveis, também podem ser
 equipadas. A troca observa os slots locais e os callbacks oficiais do servidor;
-se uma confirmação não chegar, libera a operação em até oito ticks e tenta de
+se uma confirmação não chegar, libera a operação em até dois ticks e tenta de
 novo com intervalo progressivo, sem deixar o módulo preso por vários segundos. Se ativado,
-o descarte da peça antiga só ocorre depois dessa confirmação, somente quando ela
-não possui encantamentos e só com cursor vazio; por padrão o descarte está OFF.
-Peças encantadas antigas são sempre preservadas.
+o descarte da peça antiga só ocorre depois que uma reserva válida foi equipada e
+confirmada, somente quando a peça antiga não possui encantamentos e só com cursor
+vazio; por padrão o descarte está OFF. Sem reserva válida, não descarta nada e
+mantém a peça atual no slot. Peças encantadas antigas são sempre preservadas.
 
 Usa a API de inventário do Stein, sem abrir telas nem mexer nos controles de
 movimento. O botão `Ligar/desligar Auto Armor`, a tecla selecionável, preferências

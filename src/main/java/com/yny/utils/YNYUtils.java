@@ -12,10 +12,14 @@ import org.lwjgl.input.Keyboard;
 /** Entry point do YNYUtils para o Stein Loader. */
 public final class YNYUtils implements SteinMod {
 
+    private static final int CONFIG_SAVE_DELAY_TICKS = 20;
+
     private static volatile YNYConfig config = new YNYConfig();
     private final KnockbackControl knockbackControl = new KnockbackControl(
             () -> config.knockbackEnabled, () -> config.knockbackPercent);
     private boolean toggleKeyWasDown;
+    private boolean configDirty;
+    private int configSaveDelay;
 
     @Override
     public void afterStartGame() {
@@ -24,8 +28,14 @@ public final class YNYUtils implements SteinMod {
 
     @Override
     public void onTickEnd() {
-        knockbackControl.ensureInstalled();
+        knockbackControl.installIfPending();
         updateToggleKey();
+        saveConfigIfDue();
+    }
+
+    @Override
+    public void onJoinGame() {
+        knockbackControl.requestInstallation();
     }
 
     @Override
@@ -35,15 +45,15 @@ public final class YNYUtils implements SteinMod {
                 .section("PvP")
                 .option(Option.toggle("Ativar Knockback Control", () -> config.knockbackEnabled, value -> {
                     config.knockbackEnabled = value;
-                    YNYConfig.save(config);
+                    markConfigChanged();
                 }))
                 .option(Option.slider("Velocidade recebida", 93, 100, 1, () -> config.knockbackPercent, value -> {
                     config.knockbackPercent = (int) value;
-                    YNYConfig.save(config);
+                    markConfigChanged();
                 }, value -> (int) value + "% (redução: " + (100 - (int) value) + "%)"))
                 .option(Option.key("Tecla para alternar", () -> config.knockbackToggleKey, value -> {
                     config.knockbackToggleKey = value;
-                    YNYConfig.save(config);
+                    markConfigChanged();
                 }));
     }
 
@@ -53,8 +63,26 @@ public final class YNYUtils implements SteinMod {
                 && Keyboard.isKeyDown(key);
         if (down && !toggleKeyWasDown) {
             config.knockbackEnabled = !config.knockbackEnabled;
-            YNYConfig.save(config);
+            markConfigChanged();
         }
         toggleKeyWasDown = down;
+    }
+
+    /** Agrupa mudanças rápidas de UI/keybind em uma única escrita no disco. */
+    private void markConfigChanged() {
+        configDirty = true;
+        configSaveDelay = CONFIG_SAVE_DELAY_TICKS;
+    }
+
+    private void saveConfigIfDue() {
+        if (!configDirty) {
+            return;
+        }
+        if (configSaveDelay > 0) {
+            configSaveDelay--;
+            return;
+        }
+        YNYConfig.save(config);
+        configDirty = false;
     }
 }

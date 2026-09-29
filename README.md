@@ -13,6 +13,10 @@ antes de o manipulador vanilla aplicar `motionX`, `motionY` e `motionZ`.
 O Panel oferece ativação, uma tecla selecionável para alternar o módulo e
 velocidade recebida entre 93% e 100% (padrão: 100%). O valor mostra também a
 redução correspondente.
+
+O interceptor é instalado uma vez por conexão, ao entrar no mundo. Mudanças
+seguidas de configuração ou keybind são agrupadas e gravadas uma vez, um segundo
+após a última alteração.
 O relatório técnico está em
 [`docs/knockback-control-compatibility.md`](docs/knockback-control-compatibility.md).
 

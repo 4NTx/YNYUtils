@@ -23,17 +23,30 @@ public final class KnockbackControl {
     private final IntSupplier percent;
     private volatile int localPlayerId = Integer.MIN_VALUE;
     private volatile Channel installedChannel;
+    private volatile boolean installationPending;
 
     public KnockbackControl(BooleanSupplier enabled, IntSupplier percent) {
         this.enabled = enabled;
         this.percent = percent;
     }
 
-    /** Chamado no fim do tick para acompanhar conexões e mundos novos. */
-    public void ensureInstalled() {
+    /** Solicita uma instalação para a conexão criada ao entrar no mundo. */
+    public void requestInstallation() {
+        installedChannel = null;
+        localPlayerId = Integer.MIN_VALUE;
+        installationPending = true;
+    }
+
+    /**
+     * Só consulta o Minecraft enquanto uma instalação está pendente. Depois de
+     * instalado, retorna imediatamente até o próximo {@code onJoinGame}.
+     */
+    public void installIfPending() {
+        if (!installationPending) {
+            return;
+        }
         Minecraft mc = Minecraft.getMinecraft();
         if (mc.thePlayer == null) {
-            localPlayerId = Integer.MIN_VALUE;
             return;
         }
         localPlayerId = mc.thePlayer.getEntityId();
@@ -44,12 +57,17 @@ public final class KnockbackControl {
         }
         NetworkManager network = handler.getNetworkManager();
         Channel channel = network == null ? null : network.channel;
-        if (channel == null || channel == installedChannel) {
+        if (channel == null) {
+            return;
+        }
+        if (channel == installedChannel && channel.pipeline().get(HANDLER_NAME) != null) {
+            installationPending = false;
             return;
         }
         try {
             channel.pipeline().addBefore("packet_handler", HANDLER_NAME, new VelocityInterceptor(this));
             installedChannel = channel;
+            installationPending = false;
         } catch (Exception ignored) {
             // A pipeline ainda pode estar sendo montada; o próximo tick tenta de novo.
         }

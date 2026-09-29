@@ -4,6 +4,8 @@ import java.util.Locale;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 
+import com.yny.utils.core.ReachRange;
+
 import dev.xavier.stein.loader.api.Targeting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
@@ -15,8 +17,8 @@ import net.minecraft.entity.Entity;
  */
 public final class ReachDebug {
 
-    public static final double VANILLA_REACH = 3.0D;
-    public static final double MAX_REACH = 3.9D;
+    public static final double VANILLA_REACH = ReachRange.VANILLA;
+    public static final double MAX_REACH = ReachRange.MAXIMUM;
 
     private final BooleanSupplier enabled;
     private final DoubleSupplier configuredReach;
@@ -79,10 +81,7 @@ public final class ReachDebug {
     }
 
     private static double clamp(double reach) {
-        if (Double.isNaN(reach)) {
-            return VANILLA_REACH;
-        }
-        return Math.max(VANILLA_REACH, Math.min(MAX_REACH, reach));
+        return ReachRange.clamp(reach);
     }
 
     private static final class Snapshot {

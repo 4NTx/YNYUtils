@@ -1,42 +1,40 @@
 package com.yny.utils.ui;
 
-import java.util.function.BooleanSupplier;
 import java.util.Locale;
+import java.util.function.BooleanSupplier;
 
 import dev.xavier.stein.loader.api.HudElement;
 import dev.xavier.stein.loader.api.HudPlacement;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.FontRenderer;
 
-/** Notificação temporária, posicionável no editor de HUD do Stein Loader. */
-public final class KnockbackStatusHud implements HudElement {
+/** Notificações temporárias de KB e Reach, posicionáveis pelo HUD do Stein. */
+public final class PvpStatusHud implements HudElement {
 
     private static final long DISPLAY_NANOS = 2_500_000_000L;
-    private static final String ENABLED_MESSAGE = "Knockback: ATIVADO";
-    private static final String DISABLED_MESSAGE = "Knockback: DESATIVADO";
-    private static final String MAX_MESSAGE = "Reach: DESATIVADO (3.9 blocos)";
+    private static final String KB_ENABLED = "Knockback: ATIVADO";
+    private static final String KB_DISABLED = "Knockback: DESATIVADO";
+    private static final String WIDEST_MESSAGE = "Reach: DESATIVADO (3.9 blocos)";
 
-    private final BooleanSupplier knockbackEnabled;
-    private final BooleanSupplier reachEnabled;
-    private String message = ENABLED_MESSAGE;
+    private final BooleanSupplier knockbackNotificationsEnabled;
+    private final BooleanSupplier reachNotificationsEnabled;
+    private String message = KB_ENABLED;
     private int color = 0x55FF55;
     private long visibleUntil;
     private boolean reachMessage;
 
-    public KnockbackStatusHud(BooleanSupplier knockbackEnabled, BooleanSupplier reachEnabled) {
-        this.knockbackEnabled = knockbackEnabled;
-        this.reachEnabled = reachEnabled;
+    public PvpStatusHud(BooleanSupplier knockbackNotificationsEnabled, BooleanSupplier reachNotificationsEnabled) {
+        this.knockbackNotificationsEnabled = knockbackNotificationsEnabled;
+        this.reachNotificationsEnabled = reachNotificationsEnabled;
     }
 
-    /** Mostra a mudança de estado por um curto período. */
     public void showKnockback(boolean enabled) {
-        message = enabled ? ENABLED_MESSAGE : DISABLED_MESSAGE;
+        message = enabled ? KB_ENABLED : KB_DISABLED;
         color = enabled ? 0x55FF55 : 0xFF5555;
         reachMessage = false;
         visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
 
-    /** Mostra o estado e o alcance configurado do Custom Reach. */
     public void showReach(boolean enabled, double distance) {
         message = "Reach: " + (enabled ? "ATIVADO" : "DESATIVADO") + " ("
                 + String.format(Locale.ROOT, "%.1f", distance) + " blocos)";
@@ -47,6 +45,7 @@ public final class KnockbackStatusHud implements HudElement {
 
     @Override
     public String id() {
+        // Mantém a chave anterior para preservar posição/escala já configuradas.
         return "ynyutils.knockback-status";
     }
 
@@ -57,16 +56,16 @@ public final class KnockbackStatusHud implements HudElement {
 
     @Override
     public boolean layout(boolean preview, float partialTicks) {
-        boolean enabled = reachMessage ? reachEnabled.getAsBoolean() : knockbackEnabled.getAsBoolean();
+        boolean enabled = reachMessage ? reachNotificationsEnabled.getAsBoolean()
+                : knockbackNotificationsEnabled.getAsBoolean();
         return preview || enabled && System.nanoTime() < visibleUntil;
     }
 
     @Override
     public int width() {
         FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
-        // A caixa não muda entre KB e Reach; a posição configurada não oscila.
-        return Math.max(font.getStringWidth(MAX_MESSAGE),
-                Math.max(font.getStringWidth(ENABLED_MESSAGE), font.getStringWidth(DISABLED_MESSAGE)));
+        return Math.max(font.getStringWidth(WIDEST_MESSAGE),
+                Math.max(font.getStringWidth(KB_ENABLED), font.getStringWidth(KB_DISABLED)));
     }
 
     @Override
@@ -76,9 +75,8 @@ public final class KnockbackStatusHud implements HudElement {
 
     @Override
     public void draw(boolean alignRight, float partialTicks) {
-        FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
         int x = alignRight ? -width() : 0;
-        font.drawStringWithShadow(message, x, 0, color);
+        Minecraft.getMinecraft().fontRendererObj.drawStringWithShadow(message, x, 0, color);
     }
 
     @Override

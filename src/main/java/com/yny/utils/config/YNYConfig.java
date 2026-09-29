@@ -8,6 +8,7 @@ import java.nio.file.Files;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.yny.utils.core.ReachRange;
 
 import net.minecraft.client.Minecraft;
 
@@ -37,15 +38,7 @@ public final class YNYConfig {
             if (config == null) {
                 return new YNYConfig();
             }
-            config.knockbackPercent = Math.max(93, Math.min(100, config.knockbackPercent));
-            if (Double.isNaN(config.reachDebugReach)) {
-                config.reachDebugReach = 3.0D;
-            }
-            config.reachDebugReach = Math.max(3.0D, Math.min(3.9D, config.reachDebugReach));
-            if (Double.isNaN(config.customReachDistance)) {
-                config.customReachDistance = 3.0D;
-            }
-            config.customReachDistance = Math.max(3.0D, Math.min(3.9D, config.customReachDistance));
+            config.sanitize();
             return config;
         } catch (Exception ignored) {
             return new YNYConfig();
@@ -53,6 +46,7 @@ public final class YNYConfig {
     }
 
     public static void save(YNYConfig config) {
+        config.sanitize();
         File file = file();
         File parent = file.getParentFile();
         if (parent != null) {
@@ -66,5 +60,11 @@ public final class YNYConfig {
 
     private static File file() {
         return new File(Minecraft.getMinecraft().mcDataDir, "config/ynyutils.json");
+    }
+
+    private void sanitize() {
+        knockbackPercent = Math.max(93, Math.min(100, knockbackPercent));
+        reachDebugReach = ReachRange.clamp(reachDebugReach);
+        customReachDistance = ReachRange.clamp(customReachDistance);
     }
 }

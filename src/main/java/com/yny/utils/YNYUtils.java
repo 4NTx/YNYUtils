@@ -1,17 +1,16 @@
 package com.yny.utils;
 
 import com.yny.utils.config.YNYConfig;
+import com.yny.utils.core.ToggleKey;
 import com.yny.utils.modules.pvp.KnockbackControl;
 import com.yny.utils.modules.pvp.CustomReach;
 import com.yny.utils.modules.pvp.ReachDebug;
-import com.yny.utils.ui.KnockbackStatusHud;
+import com.yny.utils.ui.PvpStatusHud;
 
 import dev.xavier.stein.loader.api.Hud;
 import dev.xavier.stein.loader.api.Option;
 import dev.xavier.stein.loader.api.Page;
 import dev.xavier.stein.loader.api.SteinMod;
-import net.minecraft.client.Minecraft;
-import org.lwjgl.input.Keyboard;
 
 /** Entry point do YNYUtils para o Stein Loader. */
 public final class YNYUtils implements SteinMod {
@@ -25,17 +24,17 @@ public final class YNYUtils implements SteinMod {
             () -> config.customReachEnabled, () -> config.customReachDistance);
     private final ReachDebug reachDebug = new ReachDebug(
             () -> config.reachDebugEnabled, () -> config.reachDebugReach);
-    private final KnockbackStatusHud knockbackStatusHud = new KnockbackStatusHud(
+    private final PvpStatusHud pvpStatusHud = new PvpStatusHud(
             () -> config.knockbackStatusHudEnabled, () -> config.customReachStatusHudEnabled);
-    private boolean toggleKeyWasDown;
-    private boolean customReachToggleKeyWasDown;
+    private final ToggleKey knockbackToggleKey = new ToggleKey();
+    private final ToggleKey customReachToggleKey = new ToggleKey();
     private boolean configDirty;
     private int configSaveDelay;
 
     @Override
     public void afterStartGame() {
         config = YNYConfig.load();
-        Hud.register(knockbackStatusHud);
+        Hud.register(pvpStatusHud);
     }
 
     @Override
@@ -58,7 +57,7 @@ public final class YNYUtils implements SteinMod {
                 .section("PvP")
                 .option(Option.toggle("Ativar Knockback Control", () -> config.knockbackEnabled, value -> {
                     config.knockbackEnabled = value;
-                    knockbackStatusHud.showKnockback(value);
+                    pvpStatusHud.showKnockback(value);
                     markConfigChanged();
                 }))
                 .option(Option.slider("Velocidade recebida", 93, 100, 1, () -> config.knockbackPercent, value -> {
@@ -86,7 +85,7 @@ public final class YNYUtils implements SteinMod {
                 .section("Custom Reach")
                 .option(Option.toggle("Custom Reach", () -> config.customReachEnabled, value -> {
                     config.customReachEnabled = value;
-                    knockbackStatusHud.showReach(value, config.customReachDistance);
+                    pvpStatusHud.showReach(value, config.customReachDistance);
                     markConfigChanged();
                 }))
                 .option(Option.slider("Alcance", CustomReach.VANILLA_REACH, CustomReach.MAX_REACH, 0.1,
@@ -111,28 +110,20 @@ public final class YNYUtils implements SteinMod {
     }
 
     private void updateToggleKey() {
-        int key = config.knockbackToggleKey;
-        boolean down = key != Keyboard.KEY_NONE && Minecraft.getMinecraft().currentScreen == null
-                && Keyboard.isKeyDown(key);
-        if (down && !toggleKeyWasDown) {
+        if (knockbackToggleKey.wasPressed(config.knockbackToggleKey)) {
             config.knockbackEnabled = !config.knockbackEnabled;
-            knockbackStatusHud.showKnockback(config.knockbackEnabled);
+            pvpStatusHud.showKnockback(config.knockbackEnabled);
             markConfigChanged();
         }
-        toggleKeyWasDown = down;
         updateCustomReachToggleKey();
     }
 
     private void updateCustomReachToggleKey() {
-        int key = config.customReachToggleKey;
-        boolean down = key != Keyboard.KEY_NONE && Minecraft.getMinecraft().currentScreen == null
-                && Keyboard.isKeyDown(key);
-        if (down && !customReachToggleKeyWasDown) {
+        if (customReachToggleKey.wasPressed(config.customReachToggleKey)) {
             config.customReachEnabled = !config.customReachEnabled;
-            knockbackStatusHud.showReach(config.customReachEnabled, config.customReachDistance);
+            pvpStatusHud.showReach(config.customReachEnabled, config.customReachDistance);
             markConfigChanged();
         }
-        customReachToggleKeyWasDown = down;
     }
 
     /** Agrupa mudanças rápidas de UI/keybind em uma única escrita no disco. */

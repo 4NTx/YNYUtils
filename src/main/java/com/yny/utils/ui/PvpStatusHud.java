@@ -17,6 +17,7 @@ public final class PvpStatusHud implements HudElement {
     private static final String WIDEST_MESSAGE = "Reach: DESATIVADO (3.9 blocos)";
     private static final String AUTO_ARMOR_ENABLED = "Auto Armor: ATIVADO";
     private static final String AUTO_ARMOR_DISABLED = "Auto Armor: DESATIVADO";
+    private static final String AUTO_ARMOR_WIDEST = "Auto Armor: aguardando confirmação do servidor";
 
     private final BooleanSupplier knockbackNotificationsEnabled;
     private final BooleanSupplier reachNotificationsEnabled;
@@ -66,6 +67,15 @@ public final class PvpStatusHud implements HudElement {
         visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
 
+    public void showAutoArmorStatus(String text) {
+        message = text;
+        color = text.contains("rejeitou") || text.contains("sem confirmação") || text.contains("não iniciada")
+                ? 0xFFAA55 : 0x55AAFF;
+        reachMessage = false;
+        autoArmorMessage = true;
+        visibleUntil = System.nanoTime() + DISPLAY_NANOS;
+    }
+
     @Override
     public String id() {
         // Mantém a chave anterior para preservar posição/escala já configuradas.
@@ -91,7 +101,8 @@ public final class PvpStatusHud implements HudElement {
         if (font != measuredFont || font.getUnicodeFlag() != measuredUnicode) {
             measuredWidth = Math.max(Math.max(font.getStringWidth(WIDEST_MESSAGE),
                     Math.max(font.getStringWidth(KB_ENABLED), font.getStringWidth(KB_DISABLED))),
-                    Math.max(font.getStringWidth(AUTO_ARMOR_ENABLED), font.getStringWidth(AUTO_ARMOR_DISABLED)));
+                    Math.max(Math.max(font.getStringWidth(AUTO_ARMOR_ENABLED), font.getStringWidth(AUTO_ARMOR_DISABLED)),
+                            Math.max(font.getStringWidth(AUTO_ARMOR_WIDEST), font.getStringWidth(message))));
             measuredFont = font;
             measuredUnicode = font.getUnicodeFlag();
         }

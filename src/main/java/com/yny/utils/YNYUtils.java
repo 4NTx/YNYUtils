@@ -31,7 +31,9 @@ public final class YNYUtils implements SteinMod {
     private final ToggleKey knockbackToggleKey = new ToggleKey();
     private final ToggleKey customReachToggleKey = new ToggleKey();
     private final ToggleKey autoArmorToggleKey = new ToggleKey();
-    private final AutoArmor autoArmor = new AutoArmor(() -> config.autoArmorEnabled);
+    private final AutoArmor autoArmor = new AutoArmor(() -> config.autoArmorEnabled,
+            () -> config.autoArmorPreventiveThreshold, () -> config.autoArmorPreferredMaterial,
+            () -> config.autoArmorDropUnenchantedOld, pvpStatusHud::showAutoArmorStatus);
     private final AttackDiagnosticsHud attackDiagnosticsHud = new AttackDiagnosticsHud(
             () -> config.attackDiagnosticsEnabled);
     private final AttackDiagnostics attackDiagnostics = new AttackDiagnostics(
@@ -61,6 +63,7 @@ public final class YNYUtils implements SteinMod {
         knockbackControl.requestInstallation();
         customReach.configurationChanged();
         attackDiagnostics.reset();
+        autoArmor.resetSession();
     }
 
     @Override
@@ -126,7 +129,23 @@ public final class YNYUtils implements SteinMod {
                         value -> {
                             config.autoArmorStatusHudEnabled = value;
                             markConfigChanged();
-                }));
+                }))
+                .option(Option.cycle("Material preferido", new String[] {
+                        "Melhor disponível", "Diamante", "Ferro", "Malha", "Ouro", "Couro"
+                }, () -> config.autoArmorPreferredMaterial, value -> {
+                    config.autoArmorPreferredMaterial = value;
+                    markConfigChanged();
+                }))
+                .option(Option.slider("Troca preventiva abaixo de", 0, 50, 5,
+                        () -> config.autoArmorPreventiveThreshold, value -> {
+                            config.autoArmorPreventiveThreshold = (int) value;
+                            markConfigChanged();
+                        }, value -> (int) value == 0 ? "Só quando quebrar" : (int) value + "% restante"))
+                .option(Option.toggle("Descartar peça antiga sem encantamentos",
+                        () -> config.autoArmorDropUnenchantedOld, value -> {
+                            config.autoArmorDropUnenchantedOld = value;
+                            markConfigChanged();
+                        }));
     }
 
     @Override
@@ -171,6 +190,16 @@ public final class YNYUtils implements SteinMod {
         if (entity instanceof Entity && oldHealth + oldAbsorption > newHealth + newAbsorption) {
             attackDiagnostics.observeDamage((Entity) entity);
         }
+    }
+
+    @Override
+    public void onSlotChanged(int windowId, int slot, Object stack) {
+        autoArmor.onSlotChanged(windowId, slot, stack);
+    }
+
+    @Override
+    public void onWindowItems(int windowId) {
+        autoArmor.onWindowItems(windowId);
     }
 
     private void updateToggleKey() {

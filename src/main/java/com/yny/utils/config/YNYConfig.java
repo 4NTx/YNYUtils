@@ -29,6 +29,11 @@ public final class YNYConfig {
     public volatile boolean autoArmorEnabled;
     public volatile int autoArmorToggleKey;
     public volatile boolean autoArmorStatusHudEnabled = true;
+    /** 0 mantém a reposição apenas para slots vazios/quebrados. */
+    public volatile int autoArmorPreventiveThreshold;
+    /** 0 = melhor disponível; 1..5 = diamante, ferro, malha, ouro, couro. */
+    public volatile int autoArmorPreferredMaterial;
+    public volatile boolean autoArmorDropUnenchantedOld;
 
     public static YNYConfig load() {
         File file = file();
@@ -67,5 +72,8 @@ public final class YNYConfig {
     private void sanitize() {
         knockbackPercent = Math.max(93, Math.min(100, knockbackPercent));
         customReachDistance = ReachRange.clamp(customReachDistance);
+        autoArmorPreventiveThreshold = Math.max(0, Math.min(50,
+                Math.round(autoArmorPreventiveThreshold / 5.0F) * 5));
+        autoArmorPreferredMaterial = Math.max(0, Math.min(5, autoArmorPreferredMaterial));
     }
 }

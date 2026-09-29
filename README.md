@@ -48,13 +48,24 @@ O relatório técnico está em
 
 ## Auto Armor
 
-Permanece ativado até você desligar, inclusive se acabar o estoque: volta a equipar
-quando uma peça quebra e surge uma reserva compatível na bolsa/hotbar.
-Prioriza maior proteção e, em empate, melhor durabilidade. Usa a API de inventário
-do Stein, sem abrir telas nem mexer nos controles de movimento. Faz no máximo uma
-troca a cada dois ticks e espera antes de tentar de novo se a confirmação demorar.
-Desativado por padrão; o botão `Ligar/desligar Auto Armor`, a tecla selecionável e
-a notificação ficam no Panel/HUD do Stein. A preferência é salva na configuração.
+Permanece ativado até você desligar, inclusive se acabar o estoque. Por padrão,
+repõe peças quebradas/vazias; a reposição preventiva pode ser habilitada com um
+limite de durabilidade restante (0% mantém o modo somente após quebrar). Nunca faz
+uma troca preventiva por uma peça de qualidade inferior.
+
+A escolha compara pontos de armadura, Proteção e encantamentos especializados,
+Espinhos, Inquebrável e durabilidade. É possível definir um material preferido;
+se não houver reserva dele, usa a melhor alternativa disponível. A troca espera
+as atualizações oficiais dos slots vindas do servidor antes de ser considerada
+concluída e nunca inicia outra enquanto a anterior estiver pendente. Se ativado,
+o descarte da peça antiga só ocorre depois dessa confirmação, somente quando ela
+não possui encantamentos e só com cursor vazio; por padrão o descarte está OFF.
+Peças encantadas antigas são sempre preservadas.
+
+Usa a API de inventário do Stein, sem abrir telas nem mexer nos controles de
+movimento. O botão `Ligar/desligar Auto Armor`, a tecla selecionável, preferências
+de equipamento e notificações ficam no Panel/HUD do Stein. Desativado por padrão;
+as preferências são salvas na configuração.
 
 ## Compilação
 

@@ -4,7 +4,12 @@ Base modular client-side para Minecraft 1.8.9 com Stein Loader/Stein SDK.
 
 O ponto de entrada é `com.yny.utils.YNYUtils`, implementando exclusivamente
 `SteinMod`. A organização inicial reserva `core`, `modules`, `config` e `ui`
-para recursos que tenham uma necessidade concreta e hooks oficiais do SDK.
+para recursos que tenham uma necessidade concreta. Compila com Stein SDK 0.2.0
+e requer a biblioteca Stein Loader 0.1.16 (instalador 0.1.23 ou mais recente).
+
+As preferências existentes permanecem em `config/ynyutils.json` e
+`config/ynydamageindicator.json`. Ambos usam `ModConfig` do SDK: valores
+inválidos voltam ao padrão campo a campo, e a gravação é atômica e agrupada.
 
 ## Knockback Control
 
@@ -14,35 +19,34 @@ O Panel oferece ativação, uma tecla selecionável para alternar o módulo e
 velocidade recebida entre 93% e 100% (padrão: 100%). O valor mostra também a
 redução correspondente.
 
+Opcionalmente, `Manter impulso vertical vanilla` aplica o percentual apenas
+em X/Z; Y permanece exatamente como veio no pacote. O `Jump Reset` é
+independente da redução: pode ficar ON com `Reduzir Knockback` OFF, caso em
+que o S12 inteiro permanece vanilla. `Pulinho ao receber KB no chão` é
+experimental e fica desligado por padrão: depois de um S12 local
+com impulso horizontal e vertical positivo, tenta um pulso de pulo normal
+somente se o jogador ainda estiver no chão. Não cria pulo no ar. Não atua
+em água, lava, teia, escadas, montarias, agachado ou com uma tela aberta;
+respeita a tecla de pulo manual e tem intervalo mínimo de 600 ms. Não gera
+ataques ou pacotes artificiais.
+
+`Logs detalhados KB/Capira/Pot` fica OFF por padrão. Quando ligado, registra
+em `logs/ynyutils-debug.log` os componentes vanilla/aplicados de cada S12
+local, a decisão do Jump Reset e os motivos de Auto Capira/Auto Pot esperarem,
+não encontrarem item na hotbar ou falharem no uso. O arquivo tem rotação
+limitada a aproximadamente 1 MB; desligue o diagnóstico depois do teste.
+
 O interceptor é instalado uma vez por conexão, ao entrar no mundo. Mudanças
-seguidas de configuração ou keybind são agrupadas e gravadas uma vez, um segundo
-após a última alteração.
+seguidas de configuração ou keybind são agrupadas pelo SDK.
 
 Ao ativar ou desativar o Knockback Control, uma notificação temporária aparece.
 Ela pode ser movida, escalada ou ocultada pelo editor de HUD do Stein Loader.
 Ela também pode ser ligada ou desligada em `Mostrar notificação do KB` no Panel.
 
-## Custom Reach
+O recurso Ataque Longo (Reach), incluindo diagnóstico, foi removido do mod
+ativo. O arquivo de trabalho anterior foi preservado localmente fora deste
+repositório para desenvolvimento posterior.
 
-Quando ligado, substitui apenas a seleção local de uma entidade na linha da
-mira, entre 3,0 e 3,9 blocos. O alvo precisa estar antes de qualquer bloco; o
-clique e a interação continuam usando os métodos vanilla e o servidor continua
-responsável por validar o alcance. Não altera hitboxes, movimento, velocity ou
-pacotes de movimento.
-
-OFF e ON com 3,0 não executam raycast adicional nem substituem a seleção vanilla.
-Ao desligar/reduzir para 3,0, a seleção anterior é restaurada imediatamente, somente
-se ainda pertencer ao YNYUtils. No criativo, preserva o alcance vanilla de 6 blocos.
-Cliques de mouse ou teclas remapeadas sincronizam a seleção com o tick do jogo;
-a prévia usa o partialTicks do quadro. Reutiliza resultados vanilla e evita
-consultas repetidas dentro da mesma fase de input.
-
-`Diagnóstico de ataques` é opcional (padrão OFF) e usa um HUD próprio do Stein.
-Mostra alvo, distância dos olhos até o contato, limite e escrita local do pacote
-de ataque. Dano observado não confirma autoria nem aceitação do servidor.
-Não é o antigo Reach Debug: nada é desenhado continuamente ao apontar um alvo.
-
-Detalhes, limitações e testes: [`docs/reach-improvements.md`](docs/reach-improvements.md).
 O relatório técnico está em
 [`docs/knockback-control-compatibility.md`](docs/knockback-control-compatibility.md).
 
@@ -55,6 +59,8 @@ independente para nome, vida, absorção e alvos distantes. Mantém o ID
 Não altera seleção/alcance de ataque, cliques ou packets. O `.steinmod`
 YNYDamageIndicator separado não deve ficar ativo junto com YNYUtils para evitar
 registrar duas cópias do mesmo HUD.
+O alvo distante é consultado por `Targeting.raycast(query)` do SDK, com o
+alcance visual e a opção de ignorar folhagem já configurados.
 
 ## Auto Armor
 
@@ -74,24 +80,53 @@ equipadas. `Usar reservas danificadas se a armadura quebrar` controla esse caso
 (ligado por padrão); desligado, nesses casos só aceita reservas com 100% de
 durabilidade. Itens literalmente destruídos não são equipáveis no Minecraft.
 A troca observa os slots locais e os callbacks oficiais do servidor;
-se uma confirmação não chegar, libera a operação em até dois ticks e tenta de
+se uma confirmação não chegar, libera a operação após um timeout limitado e tenta de
 novo com intervalo progressivo, sem deixar o módulo preso por vários segundos. Se ativado,
 o descarte da peça antiga só ocorre depois que uma reserva válida foi equipada e
 confirmada, somente quando a peça antiga não possui encantamentos e só com cursor
-vazio; por padrão o descarte está OFF. Sem reserva válida, não descarta nada e
-mantém a peça atual no slot. Peças encantadas antigas são sempre preservadas.
+vazio; essa opção de descarte rotineiro está OFF por padrão. Sem reserva válida,
+não descarta nada e mantém a peça atual no slot. Peças encantadas antigas são
+preservadas nesse fluxo normal; o último recurso para cursor preso é separado.
 
 Usa a API de inventário do Stein, sem abrir telas nem mexer nos controles de
 movimento. O botão `Ligar/desligar Auto Armor`, a tecla selecionável, preferências
 de equipamento e notificações ficam no Panel/HUD do Stein. Desativado por padrão;
 as preferências são salvas na configuração.
 
+Durante uma troca preventiva, se o servidor devolver a peça antiga ao cursor,
+o módulo tenta guardá-la com o inventário fechado e o slot livre. Ele espera
+os callbacks de cursor e destino e limita as tentativas. A opção de último recurso
+(ligada por padrão) descarta somente a peça antiga identificada em callback do
+servidor, após três devoluções sem sucesso ou oito ticks sem slot livre; exige
+troca confirmada e nova peça equipada. Nunca descarta um cursor de origem incerta.
+Mudanças manuais no inventário desabilitam esse descarte para a troca em curso.
+O diagnóstico registra apenas transições e falhas, sem escrita a cada tick.
+`logs/ynyutils-debug.log` e o arquivo anterior `ynyutils-debug.1.log` são
+limitados a aproximadamente 1 MB cada; logs antigos acima desse limite são
+descartados na próxima escrita.
+`tests/AutoArmorSafetyTest.java` cobre confirmações atrasadas/fora de ordem,
+cursor ocupado, janela aberta e destino incerto.
+
+## Auto Consumíveis
+
+O Panel permite ligar/desligar Auto Consumíveis, escolher tecla e notificação,
+e configurar capira/maçã dourada e poções bebíveis de força/velocidade nos
+modos econômico ou hard. A capira tem prioridade; só são usados itens na
+hotbar. Ao iniciar, o mod sincroniza o slot com o servidor, usa o caminho
+vanilla e restaura o slot anterior depois. Ele solta a tecla assim que observa
+o primeiro consumo, evitando iniciar um segundo item. A queda na pilha é
+provisória: a confirmação exige observar o efeito no jogador. Se o efeito não
+aparecer em até dois segundos, registra a falha e aplica uma pausa antes de
+tentar novamente. Telas abertas e uso manual suspendem a automação.
+
 ## Compilação
 
-Requer JDK 25 e o Stein SDK preparado para Minecraft 1.8.9:
+Requer JDK 25, Stein SDK 0.2.0 e Stein Loader instalado no jogo com a
+biblioteca 0.1.16 ou mais recente. Para preparar os mappings e compilar:
 
 ```powershell
-java -jar ..\stein-sdk-tool\stein-sdk.jar build
+java -jar ..\stein-sdk-tool\v0.2.0\stein-sdk.jar setup --mc ..\data\.minecraft
+java -jar ..\stein-sdk-tool\v0.2.0\stein-sdk.jar build
 ```
 
 Regressões headless, depois do build: `powershell -File tests\run.ps1`.

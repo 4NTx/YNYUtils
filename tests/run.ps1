@@ -10,13 +10,15 @@ try {
         (Join-Path $sdkCache 'stein-api.jar'), (Resolve-Path 'build\stein\classes').Path) + $libraryPaths
     $classPath = $classPath -join ';'
     New-Item -ItemType Directory -Path 'build\tests' -Force | Out-Null
-    & "$Jdk\bin\javac.exe" -encoding UTF-8 -classpath $classPath -d build\tests tests\ReachRegressionTest.java
+    & "$Jdk\bin\javac.exe" -encoding UTF-8 -classpath $classPath -d build\tests tests\AutoArmorSafetyTest.java tests\KnockbackControlTest.java
     if ($LASTEXITCODE -ne 0) { throw 'Falha compilando testes' }
     $testsPath = (Resolve-Path 'build\tests').Path
     Push-Location $testsPath
     try {
-        & "$Jdk\bin\java.exe" --sun-misc-unsafe-memory-access=allow -classpath "$testsPath;$classPath" com.yny.utils.modules.pvp.ReachRegressionTest
-        if ($LASTEXITCODE -ne 0) { throw 'Regressão detectada' }
+        & "$Jdk\bin\java.exe" -classpath "$testsPath;$classPath" com.yny.utils.modules.player.AutoArmorSafetyTest
+        if ($LASTEXITCODE -ne 0) { throw 'Regressão Auto Armor detectada' }
+        & "$Jdk\bin\java.exe" -classpath "$testsPath;$classPath" com.yny.utils.modules.pvp.KnockbackControlTest
+        if ($LASTEXITCODE -ne 0) { throw 'Regressão Knockback detectada' }
     } finally {
         Pop-Location
     }

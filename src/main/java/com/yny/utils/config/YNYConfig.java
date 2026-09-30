@@ -1,31 +1,15 @@
 package com.yny.utils.config;
 
-import java.io.File;
-import java.io.Reader;
-import java.io.Writer;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
-import com.yny.utils.core.ReachRange;
-
-import net.minecraft.client.Minecraft;
-
 /** Configuração persistida em config/ynyutils.json. */
 public final class YNYConfig {
 
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-
     public volatile boolean knockbackEnabled = true;
     public volatile int knockbackPercent = 100;
+    public volatile boolean knockbackPreserveVertical;
+    public volatile boolean knockbackJumpReset;
+    public volatile boolean pvpDiagnosticsEnabled;
     public volatile int knockbackToggleKey;
     public volatile boolean knockbackStatusHudEnabled = true;
-    public volatile boolean customReachEnabled;
-    public volatile double customReachDistance = 3.0D;
-    public volatile int customReachToggleKey;
-    public volatile boolean customReachStatusHudEnabled = true;
-    public volatile boolean attackDiagnosticsEnabled;
     public volatile boolean autoArmorEnabled;
     public volatile int autoArmorToggleKey;
     public volatile boolean autoArmorStatusHudEnabled = true;
@@ -36,46 +20,33 @@ public final class YNYConfig {
     public volatile boolean autoArmorIgnoreUnenchanted;
     public volatile boolean autoArmorUseDamagedReserves = true;
     public volatile boolean autoArmorDropUnenchantedOld;
+    /** Último recurso: descartar uma peça antiga comprovadamente presa no cursor. */
+    public volatile boolean autoArmorDropStuckOld = true;
+    public volatile boolean autoConsumablesEnabled;
+    public volatile int autoConsumablesToggleKey;
+    public volatile boolean autoConsumablesStatusHudEnabled = true;
+    /** 0 = off, 1 = health lost, 2 = while in PvP. */
+    public volatile int goldenAppleMode = 1;
+    /** 0 = prioritize enchanted, 1 = enchanted only, 2 = regular only. */
+    public volatile int goldenApplePreference;
+    /** 0 = off, 1 = when effect expires, 2 = in PvP when effect is low. */
+    public volatile int potionMode = 1;
+    public volatile boolean autoStrengthPotion = true;
+    public volatile boolean autoSpeedPotion = true;
+    public volatile int potionRefreshSeconds = 3;
+    public volatile int consumableCombatSeconds = 5;
+    public volatile int goldenAppleCooldownSeconds = 8;
 
-    public static YNYConfig load() {
-        File file = file();
-        if (!file.isFile()) {
-            return new YNYConfig();
-        }
-        try (Reader reader = Files.newBufferedReader(file.toPath(), StandardCharsets.UTF_8)) {
-            YNYConfig config = GSON.fromJson(reader, YNYConfig.class);
-            if (config == null) {
-                return new YNYConfig();
-            }
-            config.sanitize();
-            return config;
-        } catch (Exception ignored) {
-            return new YNYConfig();
-        }
-    }
-
-    public static void save(YNYConfig config) {
-        config.sanitize();
-        File file = file();
-        File parent = file.getParentFile();
-        if (parent != null) {
-            parent.mkdirs();
-        }
-        try (Writer writer = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8)) {
-            GSON.toJson(config, writer);
-        } catch (Exception ignored) {
-        }
-    }
-
-    private static File file() {
-        return new File(Minecraft.getMinecraft().mcDataDir, "config/ynyutils.json");
-    }
-
-    private void sanitize() {
+    public void sanitize() {
         knockbackPercent = Math.max(93, Math.min(100, knockbackPercent));
-        customReachDistance = ReachRange.clamp(customReachDistance);
         autoArmorPreventiveThreshold = Math.max(0, Math.min(50,
                 Math.round(autoArmorPreventiveThreshold / 5.0F) * 5));
         autoArmorPreferredMaterial = Math.max(0, Math.min(5, autoArmorPreferredMaterial));
+        goldenAppleMode = Math.max(0, Math.min(2, goldenAppleMode));
+        goldenApplePreference = Math.max(0, Math.min(2, goldenApplePreference));
+        potionMode = Math.max(0, Math.min(2, potionMode));
+        potionRefreshSeconds = Math.max(1, Math.min(10, potionRefreshSeconds));
+        consumableCombatSeconds = Math.max(1, Math.min(15, consumableCombatSeconds));
+        goldenAppleCooldownSeconds = Math.max(1, Math.min(30, goldenAppleCooldownSeconds));
     }
 }

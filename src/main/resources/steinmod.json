@@ -5,5 +5,5 @@
   "author": "Artur",
   "description": "Utilidades modulares client-side para Stein Loader.",
   "entry": "com.yny.utils.YNYUtils",
-  "loader": "0.1.15"
+  "loader": "0.1.16"
 }

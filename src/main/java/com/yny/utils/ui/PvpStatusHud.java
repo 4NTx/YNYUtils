@@ -1,6 +1,5 @@
 package com.yny.utils.ui;
 
-import java.util.Locale;
 import java.util.function.BooleanSupplier;
 
 import dev.xavier.stein.loader.api.HudElement;
@@ -14,19 +13,20 @@ public final class PvpStatusHud implements HudElement {
     private static final long DISPLAY_NANOS = 2_500_000_000L;
     private static final String KB_ENABLED = "Knockback: ATIVADO";
     private static final String KB_DISABLED = "Knockback: DESATIVADO";
-    private static final String WIDEST_MESSAGE = "Reach: DESATIVADO (3.9 blocos)";
     private static final String AUTO_ARMOR_ENABLED = "Auto Armor: ATIVADO";
     private static final String AUTO_ARMOR_DISABLED = "Auto Armor: DESATIVADO";
     private static final String AUTO_ARMOR_WIDEST = "Auto Armor: aguardando confirmação do servidor";
+    private static final String CONSUMABLES_ENABLED = "Auto Consumíveis: ATIVADO";
+    private static final String CONSUMABLES_DISABLED = "Auto Consumíveis: DESATIVADO";
 
     private final BooleanSupplier knockbackNotificationsEnabled;
-    private final BooleanSupplier reachNotificationsEnabled;
     private final BooleanSupplier autoArmorNotificationsEnabled;
+    private final BooleanSupplier consumablesNotificationsEnabled;
     private String message = KB_ENABLED;
     private int color = 0x55FF55;
     private long visibleUntil;
-    private boolean reachMessage;
     private boolean autoArmorMessage;
+    private boolean consumablesMessage;
     private FontRenderer measuredFont;
     private boolean measuredUnicode;
     private int measuredWidth;
@@ -35,35 +35,26 @@ public final class PvpStatusHud implements HudElement {
         measuredFont = null;
     }
 
-    public PvpStatusHud(BooleanSupplier knockbackNotificationsEnabled, BooleanSupplier reachNotificationsEnabled,
-            BooleanSupplier autoArmorNotificationsEnabled) {
+    public PvpStatusHud(BooleanSupplier knockbackNotificationsEnabled,
+            BooleanSupplier autoArmorNotificationsEnabled, BooleanSupplier consumablesNotificationsEnabled) {
         this.knockbackNotificationsEnabled = knockbackNotificationsEnabled;
-        this.reachNotificationsEnabled = reachNotificationsEnabled;
         this.autoArmorNotificationsEnabled = autoArmorNotificationsEnabled;
+        this.consumablesNotificationsEnabled = consumablesNotificationsEnabled;
     }
 
     public void showKnockback(boolean enabled) {
         message = enabled ? KB_ENABLED : KB_DISABLED;
         color = enabled ? 0x55FF55 : 0xFF5555;
-        reachMessage = false;
         autoArmorMessage = false;
-        visibleUntil = System.nanoTime() + DISPLAY_NANOS;
-    }
-
-    public void showReach(boolean enabled, double distance) {
-        message = "Reach: " + (enabled ? "ATIVADO" : "DESATIVADO") + " ("
-                + String.format(Locale.ROOT, "%.1f", distance) + " blocos)";
-        color = enabled ? 0x55AAFF : 0xFF5555;
-        reachMessage = true;
-        autoArmorMessage = false;
+        consumablesMessage = false;
         visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
 
     public void showAutoArmor(boolean enabled) {
         message = enabled ? AUTO_ARMOR_ENABLED : AUTO_ARMOR_DISABLED;
         color = enabled ? 0x55FF55 : 0xFF5555;
-        reachMessage = false;
         autoArmorMessage = true;
+        consumablesMessage = false;
         visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
 
@@ -71,8 +62,24 @@ public final class PvpStatusHud implements HudElement {
         message = text;
         color = text.contains("rejeitou") || text.contains("sem confirmação") || text.contains("não iniciada")
                 ? 0xFFAA55 : 0x55AAFF;
-        reachMessage = false;
         autoArmorMessage = true;
+        consumablesMessage = false;
+        visibleUntil = System.nanoTime() + DISPLAY_NANOS;
+    }
+
+    public void showAutoConsumables(boolean enabled) {
+        message = enabled ? CONSUMABLES_ENABLED : CONSUMABLES_DISABLED;
+        color = enabled ? 0x55FF55 : 0xFF5555;
+        autoArmorMessage = false;
+        consumablesMessage = true;
+        visibleUntil = System.nanoTime() + DISPLAY_NANOS;
+    }
+
+    public void showAutoConsumablesStatus(String text) {
+        message = text;
+        color = 0x55AAFF;
+        autoArmorMessage = false;
+        consumablesMessage = true;
         visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
 
@@ -89,9 +96,9 @@ public final class PvpStatusHud implements HudElement {
 
     @Override
     public boolean layout(boolean preview, float partialTicks) {
-        boolean enabled = reachMessage ? reachNotificationsEnabled.getAsBoolean()
-                : autoArmorMessage ? autoArmorNotificationsEnabled.getAsBoolean()
-                        : knockbackNotificationsEnabled.getAsBoolean();
+        boolean enabled = consumablesMessage ? consumablesNotificationsEnabled.getAsBoolean()
+                        : autoArmorMessage ? autoArmorNotificationsEnabled.getAsBoolean()
+                                : knockbackNotificationsEnabled.getAsBoolean();
         return preview || enabled && System.nanoTime() < visibleUntil;
     }
 
@@ -99,13 +106,15 @@ public final class PvpStatusHud implements HudElement {
     public int width() {
         FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
         if (font != measuredFont || font.getUnicodeFlag() != measuredUnicode) {
-            measuredWidth = Math.max(Math.max(font.getStringWidth(WIDEST_MESSAGE),
-                    Math.max(font.getStringWidth(KB_ENABLED), font.getStringWidth(KB_DISABLED))),
+            measuredWidth = Math.max(Math.max(font.getStringWidth(KB_ENABLED), font.getStringWidth(KB_DISABLED)),
                     Math.max(Math.max(font.getStringWidth(AUTO_ARMOR_ENABLED), font.getStringWidth(AUTO_ARMOR_DISABLED)),
-                            Math.max(font.getStringWidth(AUTO_ARMOR_WIDEST), font.getStringWidth(message))));
+                            Math.max(Math.max(font.getStringWidth(AUTO_ARMOR_WIDEST), font.getStringWidth(message)),
+                                    Math.max(font.getStringWidth(CONSUMABLES_ENABLED),
+                                            font.getStringWidth(CONSUMABLES_DISABLED)))));
             measuredFont = font;
             measuredUnicode = font.getUnicodeFlag();
         }
+        measuredWidth = Math.max(measuredWidth, font.getStringWidth(message));
         return measuredWidth;
     }
 

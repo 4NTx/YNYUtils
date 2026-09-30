@@ -50,6 +50,7 @@ public final class AutoConsumables {
     private int speedDurationBeforeUse;
     /** Cada perda real de vida ou absorção arma o próximo uso econômico. */
     private long damageEpoch;
+    private long lastDamageTick = -1L;
     private final long[] consumedDamageEpoch = new long[3];
     private PendingUse pendingUse;
     private PendingConfirmation pendingConfirmation;
@@ -80,17 +81,30 @@ public final class AutoConsumables {
 
     public void onHurt() {
         markCombat();
-        trace(0, "combat-hurt", "hurt recebido");
+        // O hook de hurt é o sinal de hit do servidor; também cobre hits que
+        // atingem apenas a absorção, sem depender da variação de corações.
+        registerDamage("hurt-signal");
     }
 
     public void onHealthChanged(float oldHealth, float newHealth, float oldAbsorption, float newAbsorption) {
-        if (newHealth + newAbsorption < oldHealth + oldAbsorption) {
-            damageEpoch++;
+        if (ConsumablePolicy.isDamageWithoutHurt(oldHealth, newHealth, oldAbsorption, newAbsorption)) {
             markCombat();
-            trace(0, "damage", "vida=" + oldHealth + "->" + newHealth
-                    + "; absorcao=" + oldAbsorption + "->" + newAbsorption
-                    + "; evento=" + damageEpoch);
+            registerDamage("health-drop " + oldHealth + "->" + newHealth);
+        } else if (newAbsorption < oldAbsorption) {
+            // Perder corações extras porque o efeito expirou NÃO é um hit.
+            // Um hit real na absorção já é contabilizado em onHurt().
+            trace(0, "absorption-drop-ignored", "absorcao=" + oldAbsorption
+                    + "->" + newAbsorption + "; hurtTick=" + lastDamageTick);
         }
+    }
+
+    private void registerDamage(String source) {
+        if (lastDamageTick == tick) {
+            return;
+        }
+        lastDamageTick = tick;
+        damageEpoch++;
+        trace(0, "damage", "source=" + source + "; evento=" + damageEpoch);
     }
 
     public void resetSession() {
@@ -104,6 +118,7 @@ public final class AutoConsumables {
         strengthConfirmUntil = 0L;
         speedConfirmUntil = 0L;
         damageEpoch = 0L;
+        lastDamageTick = -1L;
         for (int index = 0; index < consumedDamageEpoch.length; index++) {
             consumedDamageEpoch[index] = 0L;
         }
@@ -147,7 +162,7 @@ public final class AutoConsumables {
         int appleSetting = clamp(appleMode.getAsInt(), 0, 2);
         boolean appleTriggered = appleSetting == ConsumablePolicy.COMBAT && inCombat
                 || appleSetting == ConsumablePolicy.ECONOMIC
-                && damageEpoch > consumedDamageEpoch[0];
+                && inCombat && damageEpoch > consumedDamageEpoch[0];
 
         // Highest priority by design: don't waste a potion use window when an apple is due.
         if (appleTriggered && tick < nextFailedUseRetryTick[0]) {

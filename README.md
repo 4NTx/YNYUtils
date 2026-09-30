@@ -112,9 +112,11 @@ cursor ocupado, janela aberta e destino incerto.
 O Panel permite ligar/desligar Auto Consumíveis, escolher tecla e notificação,
 e configurar capira/maçã dourada e poções bebíveis de força/velocidade nos
 modos econômico ou combate, independentemente para maçãs e poções. No econômico,
-uma perda real de vida ou absorção arma o uso; o item só é consumido depois
-que seu efeito termina. Ao confirmar o consumo, os hits anteriores são
-considerados atendidos: sem novo dano, não há nova dose. No modo combate,
+um hit real ou perda de vida arma o uso; o item só é consumido depois
+que seu efeito termina e se a janela de PvP ainda estiver ativa. A simples
+expiração dos corações de absorção não conta como hit. Ao confirmar o consumo,
+os hits anteriores são considerados atendidos: sem novo dano, não há nova dose.
+No modo combate,
 o item é usado quando o efeito está ausente ou próximo do fim, somente na
 janela configurada após atacar um jogador ou receber um hit. A capira tem prioridade; só são usados itens na
 hotbar. Ao iniciar, o mod sincroniza o slot com o servidor, usa o caminho

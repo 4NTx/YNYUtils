@@ -8,10 +8,16 @@ final class ConsumablePolicy {
 
     private ConsumablePolicy() { }
 
+    /** Sem sinal de hurt, queda isolada de absorção pode ser só expiração. */
+    static boolean isDamageWithoutHurt(float oldHealth, float newHealth,
+            float oldAbsorption, float newAbsorption) {
+        return newHealth < oldHealth;
+    }
+
     static boolean shouldUse(int mode, boolean inCombat, long damageEpoch,
             long consumedDamageEpoch, int effectRemainingTicks, int refreshTicks) {
         if (mode == ECONOMIC) {
-            return damageEpoch > consumedDamageEpoch && effectRemainingTicks <= 0;
+            return inCombat && damageEpoch > consumedDamageEpoch && effectRemainingTicks <= 0;
         }
         if (mode == COMBAT) {
             return inCombat && effectRemainingTicks <= refreshTicks;

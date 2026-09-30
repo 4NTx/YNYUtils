@@ -25,17 +25,17 @@ public final class YNYConfig {
     public volatile boolean autoConsumablesEnabled;
     public volatile int autoConsumablesToggleKey;
     public volatile boolean autoConsumablesStatusHudEnabled = true;
-    /** 0 = off, 1 = health lost, 2 = while in PvP. */
+    /** 0 = off, 1 = novo dano e efeito expirado, 2 = renovar perto do fim durante PvP. */
     public volatile int goldenAppleMode = 1;
     /** 0 = prioritize enchanted, 1 = enchanted only, 2 = regular only. */
     public volatile int goldenApplePreference;
-    /** 0 = off, 1 = when effect expires, 2 = in PvP when effect is low. */
+    /** Mesma política de modo usada para maçãs. */
     public volatile int potionMode = 1;
     public volatile boolean autoStrengthPotion = true;
     public volatile boolean autoSpeedPotion = true;
     public volatile int potionRefreshSeconds = 3;
     public volatile int consumableCombatSeconds = 5;
-    public volatile int goldenAppleCooldownSeconds = 8;
+    public volatile int goldenAppleCooldownSeconds = 3;
 
     public void sanitize() {
         knockbackPercent = Math.max(93, Math.min(100, knockbackPercent));

@@ -10,7 +10,7 @@ try {
         (Join-Path $sdkCache 'stein-api.jar'), (Resolve-Path 'build\stein\classes').Path) + $libraryPaths
     $classPath = $classPath -join ';'
     New-Item -ItemType Directory -Path 'build\tests' -Force | Out-Null
-    & "$Jdk\bin\javac.exe" -encoding UTF-8 -classpath $classPath -d build\tests tests\AutoArmorSafetyTest.java tests\KnockbackControlTest.java
+    & "$Jdk\bin\javac.exe" -encoding UTF-8 -classpath $classPath -d build\tests tests\AutoArmorSafetyTest.java tests\KnockbackControlTest.java tests\ConsumablePolicyTest.java
     if ($LASTEXITCODE -ne 0) { throw 'Falha compilando testes' }
     $testsPath = (Resolve-Path 'build\tests').Path
     Push-Location $testsPath
@@ -19,6 +19,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Regressão Auto Armor detectada' }
         & "$Jdk\bin\java.exe" -classpath "$testsPath;$classPath" com.yny.utils.modules.pvp.KnockbackControlTest
         if ($LASTEXITCODE -ne 0) { throw 'Regressão Knockback detectada' }
+        & "$Jdk\bin\java.exe" -classpath "$testsPath;$classPath" com.yny.utils.modules.player.ConsumablePolicyTest
+        if ($LASTEXITCODE -ne 0) { throw 'Regressão Auto Consumíveis detectada' }
     } finally {
         Pop-Location
     }

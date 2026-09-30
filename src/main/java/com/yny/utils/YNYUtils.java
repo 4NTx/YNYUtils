@@ -186,7 +186,8 @@ public final class YNYUtils implements SteinMod {
                             markConfigChanged();
                         }))
                 .option(Option.cycle("Maçã dourada", new String[] {
-                        "Desativada", "Econômico: ao perder vida", "Hard: durante PvP"
+                        "Desativada", "Econômico: novo dano + efeito expirado",
+                        "Combate: renovar perto do fim em PvP"
                 }, () -> config.goldenAppleMode, value -> {
                     config.goldenAppleMode = value;
                     markConfigChanged();
@@ -197,13 +198,14 @@ public final class YNYUtils implements SteinMod {
                     config.goldenApplePreference = value;
                     markConfigChanged();
                 }))
-                .option(Option.slider("Intervalo mínimo entre maçãs", 1, 30, 1,
+                .option(Option.slider("Intervalo mínimo entre maçãs (segurança)", 1, 30, 1,
                         () -> config.goldenAppleCooldownSeconds, value -> {
                             config.goldenAppleCooldownSeconds = (int) value;
                             markConfigChanged();
                         }, value -> (int) value + " s"))
                 .option(Option.cycle("Poções de força/velocidade", new String[] {
-                        "Desativadas", "Econômico: ao expirar", "Hard: durante PvP"
+                        "Desativadas", "Econômico: novo dano + efeito expirado",
+                        "Combate: renovar perto do fim em PvP"
                 }, () -> config.potionMode, value -> {
                     config.potionMode = value;
                     markConfigChanged();
@@ -216,12 +218,12 @@ public final class YNYUtils implements SteinMod {
                     config.autoSpeedPotion = value;
                     markConfigChanged();
                 }))
-                .option(Option.slider("Renovar efeito quando restarem", 1, 10, 1,
+                .option(Option.slider("Combate: renovar quando restarem", 1, 10, 1,
                         () -> config.potionRefreshSeconds, value -> {
                             config.potionRefreshSeconds = (int) value;
                             markConfigChanged();
                         }, value -> (int) value + " s"))
-                .option(Option.slider("Duração do estado de PvP", 1, 15, 1,
+                .option(Option.slider("Combate: tempo após último hit", 1, 15, 1,
                         () -> config.consumableCombatSeconds, value -> {
                             config.consumableCombatSeconds = (int) value;
                             markConfigChanged();
@@ -253,7 +255,7 @@ public final class YNYUtils implements SteinMod {
     public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
             float newAbsorption) {
         if (entity == net.minecraft.client.Minecraft.getMinecraft().thePlayer) {
-            autoConsumables.onHealthChanged(oldHealth, newHealth);
+            autoConsumables.onHealthChanged(oldHealth, newHealth, oldAbsorption, newAbsorption);
         }
     }
 

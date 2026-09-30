@@ -19,9 +19,6 @@ import net.minecraft.potion.PotionEffect;
 
 /** Uses only normal hotbar selection and the vanilla right-click item-use path. */
 public final class AutoConsumables {
-    private static final int MODE_OFF = 0;
-    private static final int MODE_ECONOMIC = 1;
-    private static final int MODE_HARD = 2;
     private static final long TICKS_PER_SECOND = 20L;
     private static final long MIN_USE_TICKS = 32L;
     private static final long MAX_USE_TICKS = 48L;
@@ -29,8 +26,6 @@ public final class AutoConsumables {
     private static final int MAX_USE_RESTARTS = 2;
     private static final long POTION_CONFIRM_TICKS = 60L;
     private static final long SERVER_EFFECT_CONFIRM_TICKS = 40L;
-    private static final int CAPIRA_REGEN_AMPLIFIER = 4;
-    private static final int CAPIRA_REGEN_MIN_TICKS = 60;
 
     private final BooleanSupplier enabled;
     private final IntSupplier appleMode;
@@ -53,7 +48,9 @@ public final class AutoConsumables {
     private long speedConfirmUntil;
     private int strengthDurationBeforeUse;
     private int speedDurationBeforeUse;
-    private boolean healthLossPending;
+    /** Cada perda real de vida ou absorção arma o próximo uso econômico. */
+    private long damageEpoch;
+    private final long[] consumedDamageEpoch = new long[3];
     private PendingUse pendingUse;
     private PendingConfirmation pendingConfirmation;
 
@@ -86,11 +83,13 @@ public final class AutoConsumables {
         trace(0, "combat-hurt", "hurt recebido");
     }
 
-    public void onHealthChanged(float oldHealth, float newHealth) {
-        if (newHealth < oldHealth) {
-            healthLossPending = true;
+    public void onHealthChanged(float oldHealth, float newHealth, float oldAbsorption, float newAbsorption) {
+        if (newHealth + newAbsorption < oldHealth + oldAbsorption) {
+            damageEpoch++;
             markCombat();
-            trace(0, "health-loss", "vida=" + oldHealth + "->" + newHealth);
+            trace(0, "damage", "vida=" + oldHealth + "->" + newHealth
+                    + "; absorcao=" + oldAbsorption + "->" + newAbsorption
+                    + "; evento=" + damageEpoch);
         }
     }
 
@@ -104,7 +103,10 @@ public final class AutoConsumables {
         }
         strengthConfirmUntil = 0L;
         speedConfirmUntil = 0L;
-        healthLossPending = false;
+        damageEpoch = 0L;
+        for (int index = 0; index < consumedDamageEpoch.length; index++) {
+            consumedDamageEpoch[index] = 0L;
+        }
         for (int index = 0; index < lastDecision.length; index++) {
             lastDecision[index] = null;
             lastDecisionAt[index] = 0L;
@@ -134,7 +136,7 @@ public final class AutoConsumables {
         String blocked = guardReason(mc, player);
         if (blocked != null) {
             trace(0, "blocked-" + blocked, "ativo=" + enabled.getAsBoolean()
-                    + "; healthLossPending=" + healthLossPending
+                    + "; damageEpoch=" + damageEpoch
                     + "; held=" + (player == null ? "sem-jogador" : describe(player.getHeldItem())));
             trace(1, "blocked-" + blocked, "auto pot pausado");
             trace(2, "blocked-" + blocked, "auto pot pausado");
@@ -143,54 +145,49 @@ public final class AutoConsumables {
 
         boolean inCombat = tick < combatUntil;
         int appleSetting = clamp(appleMode.getAsInt(), 0, 2);
-        boolean appleDue = appleSetting == MODE_HARD ? inCombat
-                : appleSetting == MODE_ECONOMIC && healthLossPending && player.getHealth() < player.getMaxHealth();
-        if (!appleDue) {
-            trace(0, "not-due", "mode=" + appleSetting
-                    + "; combat=" + inCombat + "; healthLossPending=" + healthLossPending
-                    + "; health=" + player.getHealth() + "/" + player.getMaxHealth()
-                    + "; cooldown=" + Math.max(0L, nextAppleTick - tick));
-        }
-        if (player.getHealth() >= player.getMaxHealth()) {
-            healthLossPending = false;
-        }
+        boolean appleTriggered = appleSetting == ConsumablePolicy.COMBAT && inCombat
+                || appleSetting == ConsumablePolicy.ECONOMIC
+                && damageEpoch > consumedDamageEpoch[0];
 
         // Highest priority by design: don't waste a potion use window when an apple is due.
-        if (appleDue && tick < nextFailedUseRetryTick[0]) {
+        if (appleTriggered && tick < nextFailedUseRetryTick[0]) {
             trace(0, "retry-wait", "restam=" + (nextFailedUseRetryTick[0] - tick) + " ticks");
-        } else if (appleDue && tick >= nextAppleTick) {
+        } else if (appleTriggered && tick >= nextAppleTick) {
             int appleSlot = findGoldenApple();
             if (appleSlot < 0) {
                 trace(0, "no-hotbar-apple", "preferencia=" + applePreference.getAsInt()
                         + "; hotbar=" + hotbarSummary());
             }
-            if (appleSlot >= 0 && isEnchantedApple(appleSlot) && hasCapiraEffect(player)) {
-                // Match the macro's capira guard: Regen V (effect 10, amplifier 4+) with >3s left.
-                trace(0, "capira-effect-active", "slot=" + appleSlot);
-                healthLossPending = false;
-                appleSlot = -1;
+            int remaining = appleSlot < 0 ? 0 : appleEffectRemaining(player, isEnchantedApple(appleSlot));
+            boolean due = ConsumablePolicy.shouldUse(appleSetting, inCombat, damageEpoch,
+                    consumedDamageEpoch[0], remaining, (int) seconds(potionRefreshSeconds.getAsInt()));
+            if (appleSlot >= 0 && !due) {
+                trace(0, "effect-active", "remaining=" + remaining + "; mode=" + appleSetting
+                        + "; damageEpoch=" + damageEpoch + "; consumedEpoch=" + consumedDamageEpoch[0]);
             }
-            if (appleSlot >= 0 && beginUse(appleSlot, player)) {
+            if (appleSlot >= 0 && due && beginUse(appleSlot, player)) {
                 trace(0, "use-started", "slot=" + appleSlot);
                 status.accept("Auto Consumíveis: maçã dourada");
                 return;
             }
-        } else if (appleDue) {
+        } else if (appleTriggered) {
             trace(0, "apple-cooldown", "restam=" + (nextAppleTick - tick) + " ticks");
+        } else {
+            trace(0, "not-triggered", "mode=" + appleSetting + "; combat=" + inCombat
+                    + "; damageEpoch=" + damageEpoch + "; consumedEpoch=" + consumedDamageEpoch[0]);
         }
 
         int potionSetting = clamp(potionMode.getAsInt(), 0, 2);
-        if (potionSetting == MODE_OFF) {
+        if (potionSetting == ConsumablePolicy.OFF) {
             trace(1, "mode-off", "potions OFF");
             trace(2, "mode-off", "potions OFF");
             return;
         }
-        boolean hardTrigger = potionSetting == MODE_HARD && inCombat;
         int refreshTicks = (int) seconds(potionRefreshSeconds.getAsInt());
         int potionEffectId = Potion.damageBoost.getId();
         int potionSlot = -1;
         if (tick >= nextFailedUseRetryTick[1]) {
-            potionSlot = findPotion(player, Potion.damageBoost, strengthEnabled.getAsBoolean(), hardTrigger,
+            potionSlot = findPotion(player, Potion.damageBoost, strengthEnabled.getAsBoolean(), potionSetting, inCombat,
                     refreshTicks);
         } else {
             trace(1, "retry-wait", "restam=" + (nextFailedUseRetryTick[1] - tick) + " ticks");
@@ -198,7 +195,7 @@ public final class AutoConsumables {
         if (potionSlot < 0) {
             potionEffectId = Potion.moveSpeed.getId();
             if (tick >= nextFailedUseRetryTick[2]) {
-                potionSlot = findPotion(player, Potion.moveSpeed, speedEnabled.getAsBoolean(), hardTrigger,
+                potionSlot = findPotion(player, Potion.moveSpeed, speedEnabled.getAsBoolean(), potionSetting, inCombat,
                         refreshTicks);
             } else {
                 trace(2, "retry-wait", "restam=" + (nextFailedUseRetryTick[2] - tick) + " ticks");
@@ -288,15 +285,18 @@ public final class AutoConsumables {
             // retained, even though the use packet was sent. Hold one complete vanilla use
             // window instead of restoring immediately and oscillating back to the sword.
             int effectDuration = 0;
+            int effectAmplifier = -1;
             if (potionEffectId >= 0) {
                 Potion wanted = potionEffectId == Potion.damageBoost.getId() ? Potion.damageBoost
                         : potionEffectId == Potion.moveSpeed.getId() ? Potion.moveSpeed : null;
                 PotionEffect active = wanted == null ? null : player.getActivePotionEffect(wanted);
                 effectDuration = active == null ? 0 : active.getDuration();
+                effectAmplifier = active == null ? -1 : active.getAmplifier();
             }
             pendingUse = new PendingUse(previousSlot, hotbarSlot, tick, using, held.getItem(), held.getMetadata(),
-                    startingCount, potionEffectId, effectDuration,
-                    effectDuration(player, Potion.regeneration), effectDuration(player, Potion.absorption));
+                    startingCount, potionEffectId, effectDuration, effectAmplifier,
+                    effectDuration(player, Potion.regeneration), effectAmplifier(player, Potion.regeneration),
+                    effectDuration(player, Potion.absorption), effectAmplifier(player, Potion.absorption));
             mc().gameSettings.keyBindUseItem.pressed = true;
             log("uso iniciado: slot=" + hotbarSlot + ", item=" + held.getItem().getUnlocalizedName()
                     + ", count=" + startingCount + ", localUsing=" + using
@@ -404,9 +404,6 @@ public final class AutoConsumables {
             }
         } else {
             nextFailedUseRetryTick[finished.kind] = tick + FAILED_USE_RETRY_TICKS;
-            if (finished.item == Items.golden_apple && player.getHealth() < player.getMaxHealth()) {
-                healthLossPending = true;
-            }
         }
         restoreUseKey();
         if (Inventory.selectedHotbar() == finished.usedSlot) {
@@ -427,18 +424,32 @@ public final class AutoConsumables {
 
     private static boolean effectApplied(EntityPlayer player, PendingUse use) {
         if (use.item == Items.golden_apple) {
-            return effectDuration(player, Potion.regeneration) > use.regenerationDurationBeforeUse + 5
-                    || effectDuration(player, Potion.absorption) > use.absorptionDurationBeforeUse + 5;
+            return effectIncreased(player, Potion.regeneration, use.regenerationDurationBeforeUse,
+                    use.regenerationAmplifierBeforeUse)
+                    || effectIncreased(player, Potion.absorption, use.absorptionDurationBeforeUse,
+                    use.absorptionAmplifierBeforeUse);
         }
         Potion wanted = use.potionEffectId == Potion.damageBoost.getId() ? Potion.damageBoost
                 : use.potionEffectId == Potion.moveSpeed.getId() ? Potion.moveSpeed : null;
-        PotionEffect active = wanted == null ? null : player.getActivePotionEffect(wanted);
-        return active != null && active.getDuration() > use.effectDurationBeforeUse + 5;
+        return wanted != null && effectIncreased(player, wanted, use.effectDurationBeforeUse,
+                use.effectAmplifierBeforeUse);
+    }
+
+    private static boolean effectIncreased(EntityPlayer player, Potion effect, int beforeDuration,
+            int beforeAmplifier) {
+        PotionEffect active = player.getActivePotionEffect(effect);
+        return active != null && (active.getDuration() > beforeDuration + 5
+                || active.getAmplifier() > beforeAmplifier);
     }
 
     private static int effectDuration(EntityPlayer player, Potion effect) {
         PotionEffect active = player.getActivePotionEffect(effect);
         return active == null ? 0 : active.getDuration();
+    }
+
+    private static int effectAmplifier(EntityPlayer player, Potion effect) {
+        PotionEffect active = player.getActivePotionEffect(effect);
+        return active == null ? -1 : active.getAmplifier();
     }
 
     private void checkServerConfirmation(EntityPlayer player) {
@@ -463,9 +474,9 @@ public final class AutoConsumables {
 
     private void confirmUse(PendingUse use) {
         registerPotionConfirmation(use);
+        consumedDamageEpoch[use.kind] = damageEpoch;
         if (use.item == Items.golden_apple) {
             nextAppleTick = tick + seconds(appleCooldownSeconds.getAsInt());
-            healthLossPending = false;
         }
     }
 
@@ -531,14 +542,16 @@ public final class AutoConsumables {
                 && ((ItemStack) value).getMetadata() == 1;
     }
 
-    private static boolean hasCapiraEffect(EntityPlayer player) {
+    private static int appleEffectRemaining(EntityPlayer player, boolean enchanted) {
         PotionEffect regeneration = player.getActivePotionEffect(Potion.regeneration);
-        return regeneration != null && regeneration.getAmplifier() >= CAPIRA_REGEN_AMPLIFIER
-                && regeneration.getDuration() > CAPIRA_REGEN_MIN_TICKS;
+        if (regeneration == null || regeneration.getAmplifier() < (enchanted ? 4 : 1)) {
+            return 0;
+        }
+        return regeneration.getDuration();
     }
 
-    private int findPotion(EntityPlayer player, Potion wanted, boolean allowed, boolean hardTrigger,
-            int refreshTicks) {
+    private int findPotion(EntityPlayer player, Potion wanted, boolean allowed, int mode,
+            boolean inCombat, int refreshTicks) {
         int kind = wanted == Potion.damageBoost ? 1 : 2;
         if (!allowed) {
             trace(kind, "effect-disabled", "efeito=" + wanted.getName());
@@ -550,11 +563,11 @@ public final class AutoConsumables {
             trace(kind, "awaiting-confirmation", "remaining=" + remaining);
             return -1;
         }
-        // Economic mode waits for expiration. Hard mode can refresh near expiration during PvP,
-        // but neither mode replaces an effect with meaningful duration remaining.
-        if (remaining > 0 && (!hardTrigger || remaining > refreshTicks)) {
-            trace(kind, "effect-active", "remaining=" + remaining + "; hard=" + hardTrigger
-                    + "; refreshAt=" + refreshTicks);
+        if (!ConsumablePolicy.shouldUse(mode, inCombat, damageEpoch,
+                consumedDamageEpoch[kind], remaining, refreshTicks)) {
+            trace(kind, "not-due", "mode=" + mode + "; combat=" + inCombat
+                    + "; remaining=" + remaining + "; refreshAt=" + refreshTicks
+                    + "; damageEpoch=" + damageEpoch + "; consumedEpoch=" + consumedDamageEpoch[kind]);
             return -1;
         }
         int drinkable = 0;
@@ -649,13 +662,17 @@ public final class AutoConsumables {
         final int potionEffectId;
         final int kind;
         final int effectDurationBeforeUse;
+        final int effectAmplifierBeforeUse;
         final int regenerationDurationBeforeUse;
+        final int regenerationAmplifierBeforeUse;
         final int absorptionDurationBeforeUse;
+        final int absorptionAmplifierBeforeUse;
         boolean sawUsing;
         int restarts;
         PendingUse(int previousSlot, int usedSlot, long startedAt, boolean alreadyUsing, Item item, int metadata,
-                int startingCount, int potionEffectId, int effectDurationBeforeUse,
-                int regenerationDurationBeforeUse, int absorptionDurationBeforeUse) {
+                int startingCount, int potionEffectId, int effectDurationBeforeUse, int effectAmplifierBeforeUse,
+                int regenerationDurationBeforeUse, int regenerationAmplifierBeforeUse,
+                int absorptionDurationBeforeUse, int absorptionAmplifierBeforeUse) {
             this.previousSlot = previousSlot;
             this.usedSlot = usedSlot;
             this.firstStartedAt = startedAt;
@@ -669,8 +686,11 @@ public final class AutoConsumables {
             this.kind = potionEffectId == Potion.damageBoost.getId() ? 1
                     : potionEffectId == Potion.moveSpeed.getId() ? 2 : 0;
             this.effectDurationBeforeUse = effectDurationBeforeUse;
+            this.effectAmplifierBeforeUse = effectAmplifierBeforeUse;
             this.regenerationDurationBeforeUse = regenerationDurationBeforeUse;
+            this.regenerationAmplifierBeforeUse = regenerationAmplifierBeforeUse;
             this.absorptionDurationBeforeUse = absorptionDurationBeforeUse;
+            this.absorptionAmplifierBeforeUse = absorptionAmplifierBeforeUse;
         }
     }
 

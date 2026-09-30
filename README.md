@@ -111,7 +111,12 @@ cursor ocupado, janela aberta e destino incerto.
 
 O Panel permite ligar/desligar Auto Consumíveis, escolher tecla e notificação,
 e configurar capira/maçã dourada e poções bebíveis de força/velocidade nos
-modos econômico ou hard. A capira tem prioridade; só são usados itens na
+modos econômico ou combate, independentemente para maçãs e poções. No econômico,
+uma perda real de vida ou absorção arma o uso; o item só é consumido depois
+que seu efeito termina. Ao confirmar o consumo, os hits anteriores são
+considerados atendidos: sem novo dano, não há nova dose. No modo combate,
+o item é usado quando o efeito está ausente ou próximo do fim, somente na
+janela configurada após atacar um jogador ou receber um hit. A capira tem prioridade; só são usados itens na
 hotbar. Ao iniciar, o mod sincroniza o slot com o servidor, usa o caminho
 vanilla e restaura o slot anterior depois. Ele solta a tecla assim que observa
 o primeiro consumo, evitando iniciar um segundo item. A queda na pilha é

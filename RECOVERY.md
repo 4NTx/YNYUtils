@@ -87,4 +87,6 @@ O pacote está em `artifacts/YNYUtils.steinmod`, `build/YNYUtils.steinmod` e nas
 
 `ArmorLog` também envia o relatório completo de reservas para `DebugLog.state`, por tipo de peça. Assim, slots e motivos de rejeição continuam visíveis quando mudam, sem repetir a mesma varredura a cada tick; início, confirmação, falha e descarte continuam como eventos individuais.
 
+`StartupAudit` escreve `event=runtime_ready` em `logs/ynyutils/system-AAAA-MM-DD.log` ao entrar no mundo. A linha contém identificador do build, diretório real do jogo e estados das opções principais, sem token. `tools/AddStartupAudit.java` injeta a chamada no `onJoinGame` do pacote preservado. Use essa linha após iniciar o jogo para confirmar qual instalação e configuração foram carregadas.
+
 Validação executada: 25 verificações Auto Armor, 10 Knockback, 17 Auto Consumíveis, teste da compactação de distância, carregamento das classes com `-Xverify:all` e leitura dos JSON. Ainda falta reproduzir as trocas, o ping e a vida do alvo dentro do jogo após reiniciar o loader. Os logs disponíveis em 12/10/2026 terminam antes da instalação do pacote atualizado. Servidores podem omitir ou falsear vida, armadura, durabilidade e grupo dos outros jogadores; nesses casos a interface só pode mostrar os dados recebidos pelo cliente.

@@ -130,6 +130,7 @@ public final class YNYUtils implements SteinMod {
    }
 
    public void onJoinGame() {
+      com.yny.utils.modules.StartupAudit.log(config);
       this.knockbackControl.requestInstallation();
       this.knockbackShiftReset.reset();
       this.knockbackJumpReset.reset();

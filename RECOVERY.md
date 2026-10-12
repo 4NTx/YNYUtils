@@ -70,3 +70,7 @@ A configuração geral continua em `config/ynyutils.json` e a do Damage Indicato
 ## Correção de falha ao entrar no servidor
 
 O `.steinmod` anterior misturava `YNYUtils.class` atualizado com um `YNYConfig.class` antigo. O bytecode esperava campos de Shift Reset, aliados, filtro de Auto Armor, InvMove e Clan Ping que não existiam, causando `NoSuchFieldError` na conexão. `YNYConfig.class` foi recompilada de `recovered-src/com/yny/utils/config/YNYConfig.java` com `tools/ArmorThreshold.java` e substituída no pacote. O mesmo pacote corrigido foi copiado para `artifacts/`, `build/` e as três pastas `mods` instaladas. Integridade ZIP verificada; teste dentro do jogo ainda necessário.
+
+## Damage Indicator compacto
+
+O painel do alvo agora ocupa 250×60: ícone compacto e nick/distância no cabeçalho, vida numérica ao lado da barra animada e uma única fileira de cinco espaços para capacete, peitoral, calças, botas e item na mão. Cada espaço mostra o ícone recebido do servidor e a durabilidade restante/máxima; espaços vazios ficam marcados. Os toggles de nome, distância, números, armadura e item na mão continuam respeitados. Fonte legível atualizada em `src/main/java/com/yny/targethealth/TargetHealthElement.java`; patch reproduzível do bytecode ativo em `tools/CompactDamageIndicator.java`. O pacote atualizado está em `artifacts/YNYUtils.steinmod` e foi instalado nas três pastas de mods. A validação estrutural do bytecode e ZIP passou; falta conferir visualmente dentro do jogo.

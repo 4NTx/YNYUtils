@@ -225,21 +225,7 @@ public final class TargetHealthElement implements HudElement {
    }
 
    public int width() {
-      int base = template() == 2 ? 104 : template() == 3 ? 88 : 132;
-      int nameWidth = TargetHealthMod.settings.showName ? Render.textWidth(name) : 0;
-      int valueWidth = TargetHealthMod.settings.showNumbers ? Render.textWidth(healthText) : 0;
-      int width = Math.max(base, nameWidth + valueWidth + (valueWidth > 0 && nameWidth > 0 ? 14 : 8));
-      if (TargetHealthMod.settings.showHeldItem) {
-         width = Math.max(width, 29 + Render.textWidth(heldName) +
-                 (TargetHealthMod.settings.showDistance ? Render.textWidth(distanceText) + 16 : 8));
-      } else if (TargetHealthMod.settings.showDistance) width = Math.max(width, Render.textWidth(distanceText) + 14);
-      if (TargetHealthMod.settings.showArmorDurability) {
-         width = Math.max(width, MIN_WIDTH);
-         for (int i = 0; i < armor.length; i++) {
-            if (armor[i] != null) width = Math.max(width, 36 + Render.textWidth(ARMOR_LABELS[i] + " " + safeStackName(armor[i]) + " · " + durability(armor[i])));
-         }
-      }
-      return Math.max(MIN_WIDTH, width);
+      return MIN_WIDTH;
    }
 
    private int baseHeight() {
@@ -248,27 +234,38 @@ public final class TargetHealthElement implements HudElement {
    }
 
    public int height() {
-      return baseHeight() + (TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance ? 34 : 0)
-              + (TargetHealthMod.settings.showArmorDurability ? 78 : 0);
+      return 60;
    }
 
    public void draw(boolean alignRight, float partialTicks) {
       int width = width();
       int x = alignRight ? -width : 0;
-      int style = template();
       Render.roundRect(x, 0, width, height(), 4.0F, backgroundColor());
       Render.rect(x, 0, width, 1, 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor));
-      if (style == 1) drawHearts(x, width);
-      else if (style == 2) drawCompact(x, width);
-      else if (style == 3) drawMinimal(x, width);
-      else drawClassic(x, width);
+      drawClassic(x, width);
       drawEquipment(x, width);
    }
 
    private void drawClassic(int x, int width) {
-      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 4, 0xFFFFFFFF, true);
-      if (TargetHealthMod.settings.showNumbers) Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 4, barColor(health / maximum), true);
-      drawBar(x + 3, 18, width - 6, BAR_HEIGHT);
+      if (TargetHealthMod.settings.showName) {
+         Render.roundRect(x + 3, 2, 18, 18, 2.0F, 0xFF9C6848);
+         Render.rect(x + 8, 8, 2, 2, 0xFF33251C);
+         Render.rect(x + 14, 8, 2, 2, 0xFF33251C);
+         Render.rect(x + 9, 14, 6, 1, 0xFF633C2B);
+         int nameWidth = width - 48;
+         if (TargetHealthMod.settings.showDistance && !distanceText.isEmpty()) {
+            nameWidth = width - Render.textWidth(distanceText) - 45;
+         }
+         Render.text(Render.trim(name, nameWidth), x + 25, 5, 0xFFFFFFFF, true);
+      }
+      if (TargetHealthMod.settings.showDistance && !distanceText.isEmpty()) {
+         Render.text(distanceText, x + width - Render.textWidth(distanceText) - 4, 5, 0xFFFFDA80, true);
+      }
+      if (TargetHealthMod.settings.showNumbers) {
+         Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 17,
+                 barColor(health / maximum), true);
+      }
+      drawBar(x + 3, 20, width - 56, 5);
    }
 
    private void drawHearts(int x, int width) {
@@ -306,42 +303,25 @@ public final class TargetHealthElement implements HudElement {
    }
 
    private void drawEquipment(int x, int width) {
-      int y = baseHeight();
-      boolean itemRow = TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance;
-      if (itemRow) {
-         Render.roundRect(x + 2, y + 1, width - 4, 31, 3.0F, 0x99101822);
-         if (TargetHealthMod.settings.showHeldItem && heldItem != null) {
-            Render.item(heldItem, x + 5, y + 4, true);
-            int labelX = x + 25;
-            int rightSpace = TargetHealthMod.settings.showDistance ? Render.textWidth("Dist. " + distanceText) + 13 : 5;
-            int labelWidth = Math.max(12, width - (labelX - x) - rightSpace);
-            Render.text(Render.trim(heldName, labelWidth), labelX, y + 3, 0xFFFFFFFF, true);
-            Render.text(Render.trim(heldDurability, labelWidth), labelX, y + 16, 0xFFB7C5D4, false);
-         } else if (TargetHealthMod.settings.showHeldItem) Render.text("Mão: vazia ou sem dados", x + 6, y + 8, 0xFFB7C5D4, false);
-         if (TargetHealthMod.settings.showDistance && !distanceText.isEmpty()) {
-            String distance = "Dist. " + distanceText;
-            Render.text(distance, x + width - Render.textWidth(distance) - 6, y + 4, 0xFFFFDA80, true);
-         }
-      }
+      int start = x + (width - 210) / 2;
       if (TargetHealthMod.settings.showArmorDurability) {
-         int armorY = y + (itemRow ? 34 : 1);
-         Render.roundRect(x + 2, armorY, width - 4, 76, 3.0F, 0x99101822);
-         Render.text("SET", x + 6, armorY + 2, 0xFF8FA4B8, true);
-         String defense = "DEFESA " + armorPoints;
-         Render.text(defense, x + width - Render.textWidth(defense) - 6, armorY + 2, 0xFFFFDA80, true);
          for (int i = 0; i < armor.length; i++) {
-            int rowY = armorY + 14 + i * 15;
-            ItemStack stack = armor[i];
-            if (stack != null) {
-               Render.item(stack, x + 6, rowY - 2, true);
-               String line = ARMOR_LABELS[i] + " " + safeStackName(stack) + " · " + durability(stack);
-               Render.text(Render.trim(line, width - 32), x + 27, rowY, 0xFFB7C5D4, false);
-            } else {
-               Render.text(ARMOR_LABELS[i], x + 8, rowY, 0xFF728194, true);
-               Render.text("Vazio ou sem dados · —", x + 40, rowY, 0xFF728194, false);
-            }
+            drawItemCell(armor[i], start + i * 42, 31);
          }
       }
+      if (TargetHealthMod.settings.showHeldItem) {
+         int handX = TargetHealthMod.settings.showArmorDurability ? start + 168 : x + (width - 42) / 2;
+         drawItemCell(heldItem, handX, 31);
+      }
+   }
+
+   private void drawItemCell(ItemStack stack, int x, int y) {
+      if (stack == null) {
+         Render.text("—", x + 15, y + 19, 0xFF728194, false);
+         return;
+      }
+      Render.item(stack, x + 13, y, true);
+      Render.text(Render.trim(durability(stack), 40), x + 1, y + 19, 0xFFB7C5D4, false);
    }
 
    private static float ratio(float value, float max) { return Math.max(0.0F, Math.min(value / Math.max(1.0F, max), 1.0F)); }

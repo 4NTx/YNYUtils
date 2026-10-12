@@ -67,11 +67,6 @@ Os rótulos do painel ativo foram reorganizados por tarefa e reescritos em lingu
 
 A configuração geral continua em `config/ynyutils.json` e a do Damage Indicator em `config/ynydamageindicator.json`. Assim, as configurações existentes continuam válidas. Os nomes agora deixam explícitos o efeito, as condições de descarte, os modos econômico/combate e as unidades dos controles.
 
-
-## Correção de falha ao entrar no servidor
-
-O .steinmod anterior misturava YNYUtils.class atualizado com um YNYConfig.class antigo. O bytecode esperava campos de Shift Reset, aliados, filtro de Auto Armor, InvMove e Clan Ping que não existiam, causando NoSuchFieldError na conexão. YNYConfig.class foi recompilada de `recovered-src/com/yny/utils/config/YNYConfig.java com `tools/ArmorThreshold.java e substituída no pacote. O mesmo pacote corrigido foi copiado para `artifacts/, `build/ e as três pastas mods instaladas. Integridade ZIP verificada; teste dentro do jogo ainda necessário.
-
 ## Correção de falha ao entrar no servidor
 
 O `.steinmod` anterior misturava `YNYUtils.class` atualizado com um `YNYConfig.class` antigo. O bytecode esperava campos de Shift Reset, aliados, filtro de Auto Armor, InvMove e Clan Ping que não existiam, causando `NoSuchFieldError` na conexão. `YNYConfig.class` foi recompilada de `recovered-src/com/yny/utils/config/YNYConfig.java` com `tools/ArmorThreshold.java` e substituída no pacote. O mesmo pacote corrigido foi copiado para `artifacts/`, `build/` e as três pastas `mods` instaladas. Integridade ZIP verificada; teste dentro do jogo ainda necessário.

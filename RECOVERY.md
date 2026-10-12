@@ -138,18 +138,26 @@ O módulo `AutoProtect` (Defesa automática com espada) foi atualizado para aten
 
 ## Auto Armor: Equipamento em Slot Vazio e Correção do Filtro de Descarte
 
-Após testes no jogo em 12/10/2026, foram corrigidas duas inconsistências no Auto Armor:
-1. **Equipamento sem encantamento em slot vazio**: Anteriormente, quando `autoArmorIgnoreUnenchanted` estava ativado, o módulo rejeitava qualquer peça sem encantamento mesmo quando o jogador estava com o slot de armadura vazio (`worn == null`) ou quebrado (`isBroken(worn)`). O método `bestReplacement` em `AutoArmor` foi corrigido para que `allowUnenchanted` seja `true` quando `worn == null || isBroken(worn)`. Assim, capacetes ou armaduras sem encantamento são equipados imediatamente quando o jogador está desprotegido, enquanto reservas sem encantamento continuam sendo ignoradas se o jogador já possuir armadura funcional equipada.
-2. **Filtro de armaduras recebidas robusto (`ArmorPickupFilter`)**:
-   - **Remoção de reflexão frágil**: O método `reject` agora utiliza diretamente `Stacks.isEnchanted(stack)` e `Stacks.enchantLevel(stack, 0)` (ID 0 de Proteção) da API oficial do SteinLoader, eliminando falhas de reflexão e NoSuchMethodException.
-   - **Eliminação do bloqueio prematuro por telas e descarte de fila**: Anteriormente, o filtro gravava `seen[index]` antes de verificar se telas estavam abertas, descartando o item sem colocá-lo na fila, e `onWindowItems(0)` limpava a fila inteira. A nova arquitetura mantém uma linha de base (`baseline`) e uma fila persistente (`queued`). Peças recebidas em slots 0-35 (criadas em bancada, retiradas de baús ou coletadas do chão) que atendam aos critérios de descarte (`autoArmorDiscardReceived` + `autoArmorDiscardUnenchanted` / `autoArmorDiscardBelowP4` / `autoArmorDiscardRed8`) são seguramente enfileiradas e descartadas à taxa segura de 1 item por tick assim que o inventário volta a ficar seguro (`safe(armor)`), registrando o descarte no log.
-   - **Proteção de armadura equipada e movimentações**: O filtro rastreia também as peças equipadas (`knownEquipped`), garantindo que itens desequipados ou peças reorganizadas internamente entre slots não sejam descartadas.
-3. **Patch Reproduzível e Validação**:
-   - Implementado via `tools/PatchAutoArmorUnenchanted.java` e `tools/PatchAutoArmorAndFilter.java`.
-   - Classes compiladas com `--release 8` (major version 52).
-   - Testes unitários `tools/ArmorPickupFilterTest.java` e `tests/AutoArmorSafetyTest.java` (25 verificações) aprovados.
-   - `tools/VerifyPackageLinks.java` aprovado com 54 classes e 3556 links internos.
-   - `tools/VerifyRuntimeClasses.java` aprovado com `-Xverify:all`.
-   - Hash SHA-256 do pacote ativo: `8B6946E55754A0CFABD249F837BEFA22009F82578DA66E952B6F5B663B216E1E` sincronizado em `artifacts/`, `build/` e nas três instalações do jogo via `tools/CheckPackConflicts.ps1`.
+## Auto Armor: Resolução Completa de Equipamento em Slot Vazio, Latência de Servidor e Filtro Sem Loop
+
+Após investigação aprofundada dos logs reais de jogo (`91.190.102.46:3838`) e testes do usuário em 12/10/2026, identificamos e corrigimos três causas simultâneas que impediam o funcionamento do AutoArmor e do filtro de descarte:
+
+1. **Confirmação Imediata de Equipamento em Slot Vazio (`matchesEquipState`)**:
+   - Anteriormente, `matchesEquipState` exigia que o slot de origem (`sourceIndex`) estivesse estritamente vazio (`source == null`) ao equipar uma peça em slot vazio (`oldArmor == null`). No entanto, em servidores multiplayer reais, quando a armadura é equipada (via shift-click/windowClick), itens do inventário ou pacotes do servidor frequentemente preenchem o slot de origem com outro item (ex.: capacete de ferro ou outro bloco).
+   - Como resultado, mesmo com o peitoral de diamante já vestido no jogador, `matchesEquipState` retornava `false`. O módulo aguardava até o fim do timeout e abortava com `timeout sem troca coerente peitoral`, marcando falha e adiando futuras trocas.
+   - **Correção**: Quando `operation.oldArmor == null` (slot vazio), a verificação de `matchesReplacementArmor(armor, operation)` confirma imediatamente o sucesso (`Outcome.CONFIRMED`), pois a armadura já está no corpo e não havia armadura anterior para reposicionar.
+
+2. **Tolerância a Latência de Rede Transatlântica (`SERVER_WAIT_TIMEOUT_TICKS`)**:
+   - `SERVER_WAIT_TIMEOUT_TICKS` foi estendido de 8 ticks (400 ms) para 16 ticks (800 ms). Com latência típica de 200–250 ms para servidores europeus (Lithuania), 8 ticks era insuficiente para o ciclo completo de ida e volta do pacote, causando time-outs prematuros e pacotes duplicados.
+
+3. **Eliminação do Loop Infinito no Filtro de Descarte (`ArmorPickupFilter`)**:
+   - **Sem loop de pacotes**: Anteriormente, ao chamar `Inventory.drop(slot, true)`, o filtro definia `baseline[i] = null`. Quando servidores multiplayer (Spigot/Paper) cancelavam ou restauravam o slot (pois descartes THROW fora de GUI são rejeitados no vanilla), o item ainda permanecia no slot e era detectado novamente a cada 10 ticks em loop infinito, congestionando o cliente. A nova versão grava `baseline[i] = stack` e limita a 2 tentativas por item, cessando pacotes imediatamente caso o servidor rejeite.
+   - **Proteção Total da Hotbar**: Slots 0–8 (hotbar) são estritamente ignorados pelo filtro. Armaduras colocadas na hotbar pelo jogador ou compradas nunca são descartadas.
+   - **Prioridade ao AutoArmor**: O filtro nunca descarta uma armadura caso o jogador esteja com o slot correspondente vazio (`Inventory.armor(piece) == null`) ou quebrado. A peça permanece disponível para o AutoArmor vestir o jogador.
+
+4. **Patch Reproduzível e Validação**:
+   - Bytecode injetado via `tools/PatchAutoArmorRobust.java` com `COMPUTE_FRAMES` compatível e classes Java 8 (`--release 8`).
+   - Validações: `VerifyPackageLinks` (54 classes, 3568 links internos), `VerifyRuntimeClasses` com `-Xverify:all`, `AutoArmorSafetyTest` (25 verificações), `ArmorPickupFilterTest`, `ArmorPickupPolicyTest`, `ArmorThresholdTest` e `ArmorPickupOptionsTest` aprovados.
+   - Hash SHA-256 do pacote ativo: `40E4DAB1DB36CFC667C1C5933526E7FE9E314D0DF0D2F8C46371334969F2B21F` sincronizado em `artifacts/`, `build/` e nas três instalações do jogo via `tools/CheckPackConflicts.ps1`.
 
 

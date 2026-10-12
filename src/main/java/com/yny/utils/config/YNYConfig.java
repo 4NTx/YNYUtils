@@ -1,61 +1,80 @@
 package com.yny.utils.config;
 
-/** Configuração persistida em config/ynyutils.json. */
 public final class YNYConfig {
+   public volatile boolean knockbackEnabled = true;
+   public volatile int knockbackPercent = 93;
+   public volatile boolean knockbackPreserveVertical = true;
+   public volatile boolean knockbackShiftReset;
+   public volatile boolean knockbackJumpReset;
+   public volatile int knockbackShiftResetToggleKey;
+   public volatile int knockbackJumpResetToggleKey;
+   public volatile boolean hitThroughAlliesEnabled = true;
+   public volatile boolean pvpDiagnosticsEnabled = true;
+   public volatile int knockbackToggleKey = 39;
+   public volatile boolean knockbackStatusHudEnabled = true;
+   public volatile boolean autoArmorEnabled = true;
+   public volatile int autoArmorToggleKey = 25;
+   public volatile boolean autoArmorStatusHudEnabled = true;
+   public volatile int autoArmorPreventiveThreshold = 30;
+   public volatile boolean autoArmorDiscardReceived;
+   public volatile boolean autoArmorDiscardRed8 = true;
+   public volatile boolean autoArmorDiscardUnenchanted = true;
+   public volatile boolean autoArmorDiscardBelowP4 = true;
+   public volatile int autoArmorPreferredMaterial = 1;
+   public volatile boolean autoArmorIgnoreUnenchanted = true;
+   public volatile boolean autoArmorUseDamagedReserves = true;
+   public volatile boolean autoArmorDropUnenchantedOld = true;
+   public volatile boolean autoArmorDropStuckOld = true;
+   public volatile boolean autoConsumablesEnabled = true;
+   public volatile boolean inventoryMoveEnabled = true;
+   public volatile boolean inventoryMoveSuspendUse = true;
+   public volatile boolean autoProtectEnabled = true;
+   public volatile boolean autoProtectWindow = true;
+   public volatile boolean autoProtectLowHealthEnabled = true;
+   public volatile int autoProtectLowHealth = 10;
+   public volatile int autoProtectResumeHealth = 14;
+   public volatile int autoProtectToggleKey = 0;
+   public volatile int autoConsumablesToggleKey;
+   public volatile boolean autoConsumablesStatusHudEnabled = true;
+   public volatile int goldenAppleMode = 1;
+   public volatile int goldenApplePreference;
+   public volatile int potionMode = 2;
+   public volatile boolean autoStrengthPotion = true;
+   public volatile boolean autoSpeedPotion = true;
+   public volatile int potionRefreshSeconds = 3;
+   public volatile int consumableCombatSeconds = 8;
+   public volatile int goldenAppleCooldownSeconds = 3;
+   public volatile boolean clanPingEnabled = true;
+   public volatile boolean clanPingHudEnabled = true;
+   public volatile int clanPingLocationKey = 34;
+   public volatile int clanPingEnemyKey = 47;
+   public volatile boolean clanPingMiddleClick = true;
+   public volatile boolean clanPingSound = true;
+   public volatile boolean clanPingDistantIndicator = true;
+   public volatile int clanPingCooldownSeconds = 2;
+   public volatile float clanPingMarkerScale = 1.0F;
+   public volatile int clanPingCancelKey = 35;
+   public volatile int clanPingLocationSeconds = 45;
+   public volatile int clanPingEnemySeconds = 60;
+   public volatile int clanPingTargetRange = 64;
 
-    public volatile boolean knockbackEnabled = true;
-    public volatile int knockbackPercent = 100;
-    public volatile boolean knockbackPreserveVertical;
-    public volatile boolean knockbackJumpReset;
-    public volatile boolean pvpDiagnosticsEnabled = true;
-    public volatile int knockbackToggleKey;
-    public volatile boolean knockbackStatusHudEnabled = true;
-    public volatile boolean autoArmorEnabled;
-    public volatile int autoArmorToggleKey;
-    public volatile boolean autoArmorStatusHudEnabled = true;
-    /** 0 mantém a reposição apenas para slots vazios/quebrados. */
-    public volatile int autoArmorPreventiveThreshold;
-    /** 0 = melhor disponível; 1..5 = diamante, ferro, malha, ouro, couro. */
-    public volatile int autoArmorPreferredMaterial;
-    public volatile boolean autoArmorIgnoreUnenchanted;
-    public volatile boolean autoArmorUseDamagedReserves = true;
-    public volatile boolean autoArmorDropUnenchantedOld;
-    /** Último recurso: descartar uma peça antiga comprovadamente presa no cursor. */
-    public volatile boolean autoArmorDropStuckOld = true;
-    public volatile boolean autoConsumablesEnabled;
-    public volatile int autoConsumablesToggleKey;
-    public volatile boolean autoConsumablesStatusHudEnabled = true;
-    /** 0 = off, 1 = novo dano e efeito expirado, 2 = renovar perto do fim durante PvP. */
-    public volatile int goldenAppleMode = 1;
-    /** 0 = prioritize enchanted, 1 = enchanted only, 2 = regular only. */
-    public volatile int goldenApplePreference;
-    /** Mesma política de modo usada para maçãs. */
-    public volatile int potionMode = 1;
-    public volatile boolean autoStrengthPotion = true;
-    public volatile boolean autoSpeedPotion = true;
-    public volatile int potionRefreshSeconds = 3;
-    public volatile int consumableCombatSeconds = 5;
-    public volatile int goldenAppleCooldownSeconds = 3;
-    public volatile boolean autoProtectEnabled = true;
-    public volatile boolean autoProtectWindow = true;
-    public volatile boolean autoProtectLowHealthEnabled = true;
-    public volatile int autoProtectLowHealth = 10;
-    public volatile int autoProtectResumeHealth = 14;
-    public volatile int autoProtectToggleKey = 0;
-
-    public void sanitize() {
-        knockbackPercent = Math.max(93, Math.min(100, knockbackPercent));
-        autoArmorPreventiveThreshold = Math.max(0, Math.min(50,
-                Math.round(autoArmorPreventiveThreshold / 5.0F) * 5));
-        autoArmorPreferredMaterial = Math.max(0, Math.min(5, autoArmorPreferredMaterial));
-        goldenAppleMode = Math.max(0, Math.min(2, goldenAppleMode));
-        goldenApplePreference = Math.max(0, Math.min(2, goldenApplePreference));
-        potionMode = Math.max(0, Math.min(2, potionMode));
-        potionRefreshSeconds = Math.max(1, Math.min(10, potionRefreshSeconds));
-        consumableCombatSeconds = Math.max(1, Math.min(15, consumableCombatSeconds));
-        goldenAppleCooldownSeconds = Math.max(1, Math.min(30, goldenAppleCooldownSeconds));
-        autoProtectLowHealth = Math.max(1, Math.min(16, autoProtectLowHealth));
-        autoProtectResumeHealth = Math.max(autoProtectLowHealth + 1, Math.min(20, autoProtectResumeHealth));
-    }
+   public void sanitize() {
+      this.inventoryMoveSuspendUse = true;
+      this.autoProtectLowHealth = Math.max(1, Math.min(16, this.autoProtectLowHealth));
+      this.autoProtectResumeHealth = Math.max(this.autoProtectLowHealth + 1, Math.min(20, this.autoProtectResumeHealth));
+      this.knockbackPercent = Math.max(92, Math.min(100, this.knockbackPercent));
+      this.autoArmorPreventiveThreshold = com.yny.utils.modules.player.ArmorThreshold.normalize(this.autoArmorPreventiveThreshold);
+      this.autoArmorPreferredMaterial = Math.max(0, Math.min(5, this.autoArmorPreferredMaterial));
+      this.goldenAppleMode = Math.max(0, Math.min(2, this.goldenAppleMode));
+      this.goldenApplePreference = Math.max(0, Math.min(2, this.goldenApplePreference));
+      this.potionMode = Math.max(0, Math.min(2, this.potionMode));
+      this.potionRefreshSeconds = Math.max(1, Math.min(10, this.potionRefreshSeconds));
+      this.consumableCombatSeconds = Math.max(1, Math.min(15, this.consumableCombatSeconds));
+      this.goldenAppleCooldownSeconds = Math.max(1, Math.min(30, this.goldenAppleCooldownSeconds));
+      this.clanPingLocationSeconds = Math.max(10, Math.min(180, this.clanPingLocationSeconds));
+      this.clanPingEnemySeconds = Math.max(10, Math.min(180, this.clanPingEnemySeconds));
+      this.clanPingTargetRange = Math.max(8, Math.min(64, this.clanPingTargetRange));
+      this.clanPingCooldownSeconds = Math.max(1, Math.min(5, this.clanPingCooldownSeconds));
+      this.clanPingMarkerScale = Math.max(0.75F, Math.min(2.0F, this.clanPingMarkerScale));
+   }
 }
-

@@ -1,5 +1,4 @@
 import com.yny.utils.config.YNYConfig;
-import com.yny.utils.modules.player.ArmorPickupFilter;
 import com.yny.utils.modules.player.ArmorPickupPolicy;
 
 public final class ArmorPickupFilterTest {
@@ -12,11 +11,11 @@ public final class ArmorPickupFilterTest {
 
         // 1. Unenchanted diamond helmet (piece=3, 100% dura, ench=false, prot=0)
         boolean discardUnench = ArmorPickupPolicy.shouldDiscard(config, 3, 363, 363, false, 0);
-        if (!discardUnench) throw new AssertionError("Unenchanted helmet must be discarded!");
+        if (!discardUnench) throw new AssertionError("Unenchanted helmet must be discarded by policy!");
 
         // 2. Protection 3 diamond helmet (piece=3, 100% dura, ench=true, prot=3)
         boolean discardP3 = ArmorPickupPolicy.shouldDiscard(config, 3, 363, 363, true, 3);
-        if (!discardP3) throw new AssertionError("Protection 3 helmet must be discarded!");
+        if (!discardP3) throw new AssertionError("Protection 3 helmet must be discarded by policy!");
 
         // 3. Protection 4 diamond helmet (piece=3, 100% dura, ench=true, prot=4)
         boolean discardP4 = ArmorPickupPolicy.shouldDiscard(config, 3, 363, 363, true, 4);

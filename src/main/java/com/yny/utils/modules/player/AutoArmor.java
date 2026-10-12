@@ -31,7 +31,7 @@ public final class AutoArmor {
     private static final long CLICK_DELAY_TICKS = 1L;
     // Keep only one armor swap in flight until the server has had time to acknowledge both slots.
     // If a Stein build omits the slot callback, the local prediction gets a bounded fallback below.
-    private static final long SERVER_WAIT_TIMEOUT_TICKS = 8L;
+    private static final long SERVER_WAIT_TIMEOUT_TICKS = 16L;
     private static final int CURSOR_RETURN_TIMEOUT_TICKS = 8;
     private static final int CURSOR_RETURN_MAX_ATTEMPTS = 3;
     private static final int CURSOR_NO_SLOT_GRACE_TICKS = 8;
@@ -707,8 +707,10 @@ public final class AutoArmor {
         if (!matchesReplacementArmor(armor, operation)) {
             return false;
         }
-        return matchesFormerArmor(source, operation)
-                || operation.oldArmor != null && source == null;
+        if (operation.oldArmor == null) {
+            return true;
+        }
+        return matchesFormerArmor(source, operation) || source == null;
     }
 
     private static boolean matchesReplacementArmor(ItemStack actual, Pending operation) {

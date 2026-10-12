@@ -321,7 +321,7 @@ public final class AutoArmor {
          this.status.accept("Auto Armor: peça antiga descartada");
          this.pending = null;
       } else if (!this.pending.localApplied || !this.pending.serverConfirmed) {
-         if (this.pending.age >= 8L && Inventory.cursor() != null && this.pending.oldArmor != null) {
+         if (this.pending.age >= 16L && Inventory.cursor() != null && this.pending.oldArmor != null) {
             if (!this.pending.cursorTimeoutLogged) {
                log(
                   "FALLBACK BLOQUEADO: cursor não vazio após timeout em "
@@ -339,7 +339,7 @@ public final class AutoArmor {
                this.pending.cursorTimeoutLogged = true;
             }
          } else {
-            if (this.pending.age >= 8L) {
+            if (this.pending.age >= 16L) {
                if (this.pending.localApplied
                   && matchesEquipState(asStack(Inventory.stack(this.pending.sourceIndex)), asStack(Inventory.armor(this.pending.piece)), this.pending)) {
                   this.failedAttempts[this.pending.piece] = 0;
@@ -752,7 +752,13 @@ public final class AutoArmor {
    }
 
    private static boolean matchesEquipState(zx var0, zx var1, AutoArmor.Pending var2) {
-      return !matchesReplacementArmor(var1, var2) ? false : matchesFormerArmor(var0, var2) || var2.oldArmor != null && var0 == null;
+      if (!matchesReplacementArmor(var1, var2)) {
+         return false;
+      } else if (var2.oldArmor == null) {
+         return true;
+      } else {
+         return matchesFormerArmor(var0, var2) || var0 == null;
+      }
    }
 
    private static boolean matchesReplacementArmor(zx var0, AutoArmor.Pending var1) {

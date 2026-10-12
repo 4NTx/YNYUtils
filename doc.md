@@ -57,7 +57,7 @@ O último `data/.minecraft/logs/latest.log` disponível terminava às **03:01 de
 ## Verificações já realizadas
 
 - `tests/AllyAttackFlowTest.java`: passou com os dois resultados determinísticos, `GROUP`, inimigo e parede. Testa seleção, não pacotes ou dano no servidor.
-- `tools/VerifyPackageLinks.java`: passou com **53 classes e 3523 referências internas** resolvidas no pacote desta etapa. Não verifica todas as chamadas à API externa.
+- `tools/VerifyPackageLinks.java`: passou com **54 classes e 3568 referências internas** resolvidas no pacote desta etapa. Não verifica todas as chamadas à API externa.
 - `tools/VerifyRuntimeClasses.java` com `-Xverify:all`: passou; executa também a rotina do latch de vida. Não renderiza a HUD no jogo.
 - `tools/CheckPackConflicts.ps1`: passou nas três instalações; os hashes são iguais.
 - Antes desta etapa, `tests/run.ps1` passou 25 verificações Auto Armor, 10 Knockback e 17 Auto Consumíveis. Rodar novamente após mudanças futuras.

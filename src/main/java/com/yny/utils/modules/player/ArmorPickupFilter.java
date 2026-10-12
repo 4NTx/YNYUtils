@@ -11,6 +11,7 @@ public final class ArmorPickupFilter {
     private static final Object[] baseline = new Object[36];
     private static final Object[] knownEquipped = new Object[4];
     private static final boolean[] queued = new boolean[36];
+    private static final int[] dropAttempts = new int[36];
     private static final long[] attemptedAt = new long[36];
     private static final Field pendingField;
     private static final Field actionField;
@@ -36,6 +37,7 @@ public final class ArmorPickupFilter {
         Arrays.fill(baseline, null);
         Arrays.fill(knownEquipped, null);
         Arrays.fill(queued, false);
+        Arrays.fill(dropAttempts, 0);
         Arrays.fill(attemptedAt, 0L);
         initialized = false;
         tick = 0L;
@@ -53,10 +55,11 @@ public final class ArmorPickupFilter {
     public static void onSlotChanged(int window, int slot, Object stack, YNYConfig config) {
         if (window != 0 || config == null || !config.autoArmorDiscardReceived) return;
         int index = Inventory.inventoryIndexOf(slot);
-        if (index < 0 || index >= 36) return;
+        if (index < 9 || index >= 36) return; // NEVER touch hotbar (0-8)
         if (stack == null) {
             queued[index] = false;
             baseline[index] = null;
+            dropAttempts[index] = 0;
             return;
         }
         if (initialized && !isKnown(stack) && !isEquipped(stack) && reject(stack, config)) {
@@ -89,6 +92,7 @@ public final class ArmorPickupFilter {
         }
         if (config == null || !config.autoArmorDiscardReceived) {
             Arrays.fill(queued, false);
+            Arrays.fill(dropAttempts, 0);
             snapshot();
             return false;
         }
@@ -97,12 +101,14 @@ public final class ArmorPickupFilter {
             return false;
         }
 
-        // Scan all 36 slots for unrecorded/newly received armor matching discard policy
-        for (int i = 0; i < 36; i++) {
+        // Scan slots 9 to 35 for unrecorded/newly received armor matching discard policy
+        // HOTBAR (slots 0-8) IS NEVER SCANNED OR DROPPED
+        for (int i = 9; i < 36; i++) {
             Object current = Inventory.stack(i);
             if (current == null) {
                 queued[i] = false;
                 baseline[i] = null;
+                dropAttempts[i] = 0;
                 continue;
             }
             if (!isKnown(current) && !isEquipped(current)) {
@@ -120,10 +126,16 @@ public final class ArmorPickupFilter {
         }
 
         // Process at most 1 drop per tick for smooth execution without packet spam
-        for (int i = 0; i < 36; i++) {
+        for (int i = 9; i < 36; i++) {
             if (!queued[i]) continue;
             Object stack = Inventory.stack(i);
             if (stack == null || !reject(stack, config)) {
+                queued[i] = false;
+                baseline[i] = stack;
+                dropAttempts[i] = 0;
+                continue;
+            }
+            if (dropAttempts[i] >= 2) {
                 queued[i] = false;
                 baseline[i] = stack;
                 continue;
@@ -136,13 +148,14 @@ public final class ArmorPickupFilter {
                 continue;
             }
             attemptedAt[i] = tick;
+            dropAttempts[i]++;
+            baseline[i] = stack; // Prevent re-scan loop
             if (Inventory.drop(slot, true)) {
                 queued[i] = false;
-                baseline[i] = null;
                 DebugLog.write("AutoArmor", "filtro descartou armadura recebida no slot " + i + ": " + Stacks.name(stack));
                 return true;
             } else {
-                DebugLog.write("AutoArmor", "filtro: descarte recusado no slot " + i + "; nova tentativa após intervalo seguro");
+                DebugLog.write("AutoArmor", "filtro: descarte recusado no slot " + i + "; tentativa " + dropAttempts[i]);
             }
         }
         return false;
@@ -194,10 +207,21 @@ public final class ArmorPickupFilter {
         if (stack == null || config == null || !config.autoArmorDiscardReceived) return false;
         int piece = Inventory.armorPiece(stack);
         if (piece < 0) return false;
+        // Never discard armor if the player has an empty or broken slot for this piece!
+        Object worn = Inventory.armor(piece);
+        if (worn == null || isBrokenStack(worn)) {
+            return false;
+        }
         int max = Stacks.maxDamage(stack);
         int remaining = max - Stacks.damage(stack);
         boolean enchanted = Stacks.isEnchanted(stack);
         int protection = Stacks.enchantLevel(stack, 0); // 0 = Protection in Minecraft 1.8.9
         return ArmorPickupPolicy.shouldDiscard(config, piece, remaining, max, enchanted, protection);
+    }
+
+    private static boolean isBrokenStack(Object stack) {
+        if (stack == null) return true;
+        int max = Stacks.maxDamage(stack);
+        return max > 0 && Stacks.damage(stack) >= max;
     }
 }

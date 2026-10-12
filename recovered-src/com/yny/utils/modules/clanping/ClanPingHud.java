@@ -21,7 +21,7 @@ final class ClanPingHud implements HudElement {
   }
   enemy=active.enemy;
   stale=enemy&&Entities.player(active.targetName)==null;
-  target=enemy?active.targetName:"Local marcado";
+  target=enemy?PingClanName.display(active.targetName):"Local marcado";
   author=active.author;
   seconds=PingHudModel.seconds(active.expiresAt,System.currentTimeMillis());
   Object self=Entities.self();

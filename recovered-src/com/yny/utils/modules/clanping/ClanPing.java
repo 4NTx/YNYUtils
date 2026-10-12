@@ -577,11 +577,7 @@ public final class ClanPing {
    }
 
    private static String targetDisplayName(Object entity, String fallback) {
-      try {
-         String display = Entities.displayName(entity);
-         if (display != null && !display.trim().isEmpty()) return display;
-      } catch (Throwable ignored) { }
-      return fallback;
+      return PingClanName.display(fallback);
    }
 
    private void renderEnemyLastKnownWaypoint(float var1) {

@@ -321,7 +321,7 @@ public final class AutoArmor {
          this.status.accept("Auto Armor: peça antiga descartada");
          this.pending = null;
       } else if (!this.pending.localApplied || !this.pending.serverConfirmed) {
-         if (this.pending.age >= 8L && Inventory.cursor() != null) {
+         if (this.pending.age >= 8L && Inventory.cursor() != null && this.pending.oldArmor != null) {
             if (!this.pending.cursorTimeoutLogged) {
                log(
                   "FALLBACK BLOQUEADO: cursor não vazio após timeout em "
@@ -339,7 +339,7 @@ public final class AutoArmor {
                this.pending.cursorTimeoutLogged = true;
             }
          } else {
-            if (this.pending.age >= Long.MAX_VALUE) {
+            if (this.pending.age >= 8L) {
                if (this.pending.localApplied
                   && matchesEquipState(asStack(Inventory.stack(this.pending.sourceIndex)), asStack(Inventory.armor(this.pending.piece)), this.pending)) {
                   this.failedAttempts[this.pending.piece] = 0;
@@ -697,11 +697,14 @@ public final class AutoArmor {
          );
       }
 
-      return var4 != null ? var4 : var5;
+      return var4;
    }
 
    private static boolean isPreventiveUpgrade(zx var0, zx var1) {
-      return Inventory.armorValue(var0) >= Inventory.armorValue(var1) && durabilityPercent(var0) > durabilityPercent(var1);
+      return Inventory.armorValue(var0) >= Inventory.armorValue(var1)
+         && level(aci.c, var0) >= level(aci.c, var1)
+         && protectionScore(var0) >= protectionScore(var1)
+         && durabilityPercent(var0) > durabilityPercent(var1);
    }
 
    private static int compare(AutoArmor.Choice var0, AutoArmor.Choice var1) {

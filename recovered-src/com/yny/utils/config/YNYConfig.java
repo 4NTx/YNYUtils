@@ -9,7 +9,7 @@ public final class YNYConfig {
    public volatile int knockbackShiftResetToggleKey;
    public volatile int knockbackJumpResetToggleKey;
    public volatile boolean hitThroughAlliesEnabled = true;
-   public volatile boolean pvpDiagnosticsEnabled;
+   public volatile boolean pvpDiagnosticsEnabled = true;
    public volatile int knockbackToggleKey = 39;
    public volatile boolean knockbackStatusHudEnabled = true;
    public volatile boolean autoArmorEnabled = true;
@@ -39,7 +39,7 @@ public final class YNYConfig {
    public volatile int consumableCombatSeconds = 8;
    public volatile int goldenAppleCooldownSeconds = 3;
    public volatile boolean clanPingEnabled = true;
-   public volatile boolean clanPingHudEnabled;
+   public volatile boolean clanPingHudEnabled = true;
    public volatile int clanPingLocationKey = 34;
    public volatile int clanPingEnemyKey = 47;
    public volatile boolean clanPingMiddleClick = true;

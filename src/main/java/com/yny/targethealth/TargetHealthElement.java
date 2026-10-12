@@ -91,7 +91,7 @@ public final class TargetHealthElement implements HudElement {
       Object self = Entities.self();
       distanceText = self == null ? "" : String.format(Locale.ROOT, "%.1fm", (double)Entities.distance(self, next));
       readEquipment(next);
-      DebugLog.state("DamageIndicator", "distance", distanceText);
+      DebugLog.state("DamageIndicator", "distance", DistanceLog.bucket(distanceText));
       DebugLog.state("DamageIndicator", "held", heldName + "; durability=" + heldDurability);
       DebugLog.state("DamageIndicator", "armor", armorSummary());
    }

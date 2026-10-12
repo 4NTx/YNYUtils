@@ -1,0 +1,19 @@
+{
+  "enabled": true,
+  "showName": true,
+  "showNumbers": true,
+  "showAbsorption": true,
+  "showDistantTargets": true,
+  "showHeldItem": true,
+  "showArmorDurability": true,
+  "showDistance": true,
+  "ignoreLeaves": false,
+  "ignoreArmorStands": true,
+  "ignoreAllies": true,
+  "dynamicHealthColor": true,
+  "rangeIndex": 1,
+  "opacityIndex": 2,
+  "templateIndex": 0,
+  "accentColor": "7",
+  "healthColor": "4"
+}

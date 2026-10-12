@@ -2,21 +2,40 @@ package com.yny.utils.modules.player;
 
 import com.yny.utils.config.YNYConfig;
 import com.yny.utils.core.DebugLog;
+import com.yny.utils.core.ToggleKey;
+import dev.xavier.stein.loader.api.Chat;
 import dev.xavier.stein.loader.api.Entities;
 import dev.xavier.stein.loader.api.Inventory;
 import dev.xavier.stein.loader.api.Keys;
+import dev.xavier.stein.loader.api.ModConfig;
 import dev.xavier.stein.loader.api.Screens;
 import dev.xavier.stein.loader.api.Stacks;
 import dev.xavier.stein.loader.api.Keys.GameKey;
 
 /** Owns sword defense without competing with InvMove or AutoConsumables. */
 public final class AutoProtect {
+    private static final ToggleKey toggleKey = new ToggleKey();
     private static boolean lowHealthActive;
     private static boolean holding;
     private static int previousSlot = -1;
     private static int swordSlot = -1;
 
     private AutoProtect() { }
+
+    public static void checkToggleKey(YNYConfig config, ModConfig<YNYConfig> store) {
+        if (config == null || config.autoProtectToggleKey == 0) return;
+        if (toggleKey.wasPressed(config.autoProtectToggleKey)) {
+            config.autoProtectEnabled = !config.autoProtectEnabled;
+            if (!config.autoProtectEnabled) {
+                reset();
+            }
+            Chat.actionBar(config.autoProtectEnabled ? "§aDefesa Automática: ATIVADA" : "§cDefesa Automática: DESATIVADA");
+            DebugLog.write("AutoProtect", "event=toggle_key; enabled=" + config.autoProtectEnabled + "; key=" + config.autoProtectToggleKey);
+            if (store != null) {
+                store.saveSoon();
+            }
+        }
+    }
 
     public static void onTick(YNYConfig config, boolean useKeyReserved) {
         Object self = Entities.self();
@@ -25,12 +44,16 @@ public final class AutoProtect {
             return;
         }
         float health = Entities.health(self);
-        if (health <= config.autoProtectLowHealth) lowHealthActive = true;
-        if (health >= config.autoProtectResumeHealth) lowHealthActive = false;
+        if (config.autoProtectLowHealthEnabled) {
+            if (health <= config.autoProtectLowHealth) lowHealthActive = true;
+            if (health >= config.autoProtectResumeHealth) lowHealthActive = false;
+        } else {
+            lowHealthActive = false;
+        }
 
         boolean screen = Screens.isOpen();
         boolean movingInScreen = shouldReleaseForMovement(screen, moving());
-        boolean shouldDefend = (lowHealthActive || config.autoProtectWindow && screen)
+        boolean shouldDefend = (lowHealthActive || (config.autoProtectWindow && screen))
                 && !movingInScreen && !useKeyReserved;
         if (!shouldDefend) {
             release(movingInScreen ? "invmove_moving" : useKeyReserved ? "use_key_reserved" : "condition_ended");

@@ -13,8 +13,12 @@ public final class AutoProtectOptions {
         page.section("Defesa automática (YNYUtils)")
             .option(Option.toggle("Defender automaticamente com espada", () -> config.autoProtectEnabled,
                 value -> { config.autoProtectEnabled = value; store.saveSoon(); }))
+            .option(Option.key("Atalho para alternar defesa automática", () -> config.autoProtectToggleKey,
+                value -> { config.autoProtectToggleKey = value; store.saveSoon(); }))
             .option(Option.toggle("Defender ao abrir janela, parado", () -> config.autoProtectWindow,
                 value -> { config.autoProtectWindow = value; store.saveSoon(); }))
+            .option(Option.toggle("Defender por vida baixa", () -> config.autoProtectLowHealthEnabled,
+                value -> { config.autoProtectLowHealthEnabled = value; store.saveSoon(); }))
             .option(Option.slider("Defender quando vida chegar a", 1, 16, 1,
                 () -> config.autoProtectLowHealth,
                 value -> { config.autoProtectLowHealth = (int) value; config.sanitize(); store.saveSoon(); },

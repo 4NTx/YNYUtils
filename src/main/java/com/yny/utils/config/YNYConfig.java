@@ -36,6 +36,12 @@ public final class YNYConfig {
     public volatile int potionRefreshSeconds = 3;
     public volatile int consumableCombatSeconds = 5;
     public volatile int goldenAppleCooldownSeconds = 3;
+    public volatile boolean autoProtectEnabled = true;
+    public volatile boolean autoProtectWindow = true;
+    public volatile boolean autoProtectLowHealthEnabled = true;
+    public volatile int autoProtectLowHealth = 10;
+    public volatile int autoProtectResumeHealth = 14;
+    public volatile int autoProtectToggleKey = 0;
 
     public void sanitize() {
         knockbackPercent = Math.max(93, Math.min(100, knockbackPercent));
@@ -48,6 +54,8 @@ public final class YNYConfig {
         potionRefreshSeconds = Math.max(1, Math.min(10, potionRefreshSeconds));
         consumableCombatSeconds = Math.max(1, Math.min(15, consumableCombatSeconds));
         goldenAppleCooldownSeconds = Math.max(1, Math.min(30, goldenAppleCooldownSeconds));
+        autoProtectLowHealth = Math.max(1, Math.min(16, autoProtectLowHealth));
+        autoProtectResumeHealth = Math.max(autoProtectLowHealth + 1, Math.min(20, autoProtectResumeHealth));
     }
 }
 

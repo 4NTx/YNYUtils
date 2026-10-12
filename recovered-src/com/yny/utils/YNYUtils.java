@@ -473,6 +473,8 @@ public final class YNYUtils implements SteinMod {
       if (this.clanPing.wasCancelPressed(config.clanPingCancelKey)) {
          this.clanPing.cancelOwnPing();
       }
+
+      AutoProtect.checkToggleKey(config, this.configStore);
    }
 
    private void markConfigChanged() {

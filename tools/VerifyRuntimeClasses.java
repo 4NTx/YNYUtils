@@ -20,10 +20,15 @@ public final class VerifyRuntimeClasses {
         Class.forName("com.yny.targethealth.TargetHudRenderer", false, loader);
         Object config = Class.forName("com.yny.utils.config.YNYConfig", true, loader).getConstructor().newInstance();
         if (!config.getClass().getField("autoProtectEnabled").getBoolean(config)
+                || !config.getClass().getField("autoProtectLowHealthEnabled").getBoolean(config)
+                || config.getClass().getField("autoProtectToggleKey").getInt(config) != 0
                 || !config.getClass().getField("pvpDiagnosticsEnabled").getBoolean(config)
                 || !config.getClass().getField("clanPingHudEnabled").getBoolean(config)) {
-            throw new AssertionError("log and ping HUD defaults must be enabled");
+            throw new AssertionError("log, ping HUD, and auto-protect defaults must match expected configuration");
         }
+        Class.forName("com.yny.utils.modules.player.AutoProtect", false, loader)
+                .getMethod("checkToggleKey", Class.forName("com.yny.utils.config.YNYConfig", false, loader),
+                        Class.forName("dev.xavier.stein.loader.api.ModConfig", false, loader));
         java.lang.reflect.Method group = Class.forName("com.yny.utils.core.DebugLog", false, loader)
                 .getDeclaredMethod("fileGroup", String.class);
         group.setAccessible(true);

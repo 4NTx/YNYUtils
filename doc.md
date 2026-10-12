@@ -24,15 +24,19 @@ Pedidos funcionais:
 
 ## Estado implementado nesta etapa
 
-O pacote instalado tem SHA-256 `A96D3FCA0AF6F844D14649E808FCEC9300B09AAD74D4528BDAEB8B5B7D524F8D`. O mesmo hash está em `artifacts/`, `build/` e nas três instalações abaixo.
+O pacote instalado tem SHA-256 `00E23B0A670FD59665C9A666603B33A1AEF11262BC9CC2DE316B6E020E8D3BCF`. O mesmo hash está em `artifacts/`, `build/` e nas três instalações abaixo.
 
 Principais melhorias aplicadas nesta etapa:
 
-1. **Clan Ping: fluidez e interpolação contínua (anti-lag)**: O rastreamento de movimento do jogador inimigo marcado ("ATACAR ESTE INIMIGO") agora calcula a posição interpolada em tempo real via `prevPosX + (posX - prevPosX) * partialTicks`, alinhando perfeitamente a bounding box vermelha e o nametag 3D flutuante com a câmera em 144+ FPS. O engasgo causado por vetores de tick estáticos foi eliminado.
-2. **Clã do inimigo na marcação do mundo**: `PingClanName.display(entity, nick)` resolve o clã via `Players.group(nick)`, prefixo ou tag entre colchetes em Tab/displayName, formatando como `§7[CLÃ] §fNick` sem duplicar tags existentes e tratando sufixos de rank (`[VIP+]`, `[MVP++]`) e parênteses. `targetDisplayName` no `ClanPing` repassa a entidade para exibição imediata no nametag e na última posição conhecida.
-3. **50% de chance de hit em aliado e 0% no mesmo clã**: `HitThroughAllies` compilado com `--release 8` (bytecode 52). Membros do mesmo clã (`Relation.GROUP`) nunca recebem clique e 100% das vezes passam para o inimigo atrás; aliados (`Relation.ALLY`) passam por rolagem 50/50 preservando clique vanilla em 50% dos casos.
-4. **Damage Indicator e HUD**: Mantido o layout com altura dinâmica (32 px / 58 px), skins reais e nomes/vida ampliados em 1.15x.
-5. **Compatibilidade e Verificação**: Classes compiladas em Java 8 (`--release 8`). Verificado via `AllyAttackFlowTest`, `PingClanNameTest`, `TargetClanNameTest`, `TargetHudRendererTest`, `VerifyPackageLinks` (54 classes, 3526 links), `VerifyRuntimeClasses` com `-Xverify:all`, `run.ps1` e `CheckPackConflicts.ps1`.
+1. **AutoProtect Opção 2 (Toggle de Vida Baixa e Tecla de Atalho)**:
+   - Adicionado `autoProtectLowHealthEnabled` (booleano, padrão `true`) permitindo ativar ou desligar a defesa automática por vida baixa sem remover os sliders de HP (`autoProtectLowHealth` e `autoProtectResumeHealth`).
+   - Mantida a defesa automática ao abrir janela parado (`autoProtectWindow`).
+   - Adicionada tecla configurável `autoProtectToggleKey` (padrão `0` / "Nenhum") para alternar o AutoProtect sob demanda. Ao pressionar, alterna o módulo, notifica via Action Bar (`§aDefesa Automática: ATIVADA` / `§cDefesa Automática: DESATIVADA`), registra em log (`DebugLog`) e salva as configurações imediatamente. Se desligado durante a defesa, solta o bloqueio e restaura o slot anterior da hotbar.
+2. **Clan Ping: fluidez e interpolação contínua (anti-lag)**: O rastreamento de movimento do jogador inimigo marcado ("ATACAR ESTE INIMIGO") agora calcula a posição interpolada em tempo real via `prevPosX + (posX - prevPosX) * partialTicks`, alinhando perfeitamente a bounding box vermelha e o nametag 3D flutuante com a câmera em 144+ FPS. O engasgo causado por vetores de tick estáticos foi eliminado.
+3. **Clã do inimigo na marcação do mundo**: `PingClanName.display(entity, nick)` resolve o clã via `Players.group(nick)`, prefixo ou tag entre colchetes em Tab/displayName, formatando como `§7[CLÃ] §fNick` sem duplicar tags existentes e tratando sufixos de rank (`[VIP+]`, `[MVP++]`) e parênteses. `targetDisplayName` no `ClanPing` repassa a entidade para exibição imediata no nametag e na última posição conhecida.
+4. **50% de chance de hit em aliado e 0% no mesmo clã**: `HitThroughAllies` compilado com `--release 8` (bytecode 52). Membros do mesmo clã (`Relation.GROUP`) nunca recebem clique e 100% das vezes passam para o inimigo atrás; aliados (`Relation.ALLY`) passam por rolagem 50/50 preservando clique vanilla em 50% dos casos.
+5. **Damage Indicator e HUD**: Mantido o layout com altura dinâmica (32 px / 58 px), skins reais e nomes/vida ampliados em 1.15x.
+6. **Compatibilidade e Verificação**: Classes compiladas em Java 8 (`--release 8`). Verificado via `AutoProtectTest`, `AllyAttackFlowTest`, `PingClanNameTest`, `TargetClanNameTest`, `TargetHudRendererTest`, `VerifyPackageLinks` (54 classes, 3551 links), `VerifyRuntimeClasses` com `-Xverify:all`, `run.ps1` e `CheckPackConflicts.ps1`.
 
 
 ## Instalações e ambiente

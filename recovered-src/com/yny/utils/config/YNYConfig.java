@@ -30,8 +30,10 @@ public final class YNYConfig {
    public volatile boolean inventoryMoveSuspendUse = true;
    public volatile boolean autoProtectEnabled = true;
    public volatile boolean autoProtectWindow = true;
+   public volatile boolean autoProtectLowHealthEnabled = true;
    public volatile int autoProtectLowHealth = 10;
    public volatile int autoProtectResumeHealth = 14;
+   public volatile int autoProtectToggleKey = 0;
    public volatile int autoConsumablesToggleKey;
    public volatile boolean autoConsumablesStatusHudEnabled = true;
    public volatile int goldenAppleMode = 1;

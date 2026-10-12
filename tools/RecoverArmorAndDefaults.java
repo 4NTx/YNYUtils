@@ -12,12 +12,14 @@ public final class RecoverArmorAndDefaults {
     private static final String INVENTORY = "dev/xavier/stein/loader/api/Inventory";
 
     public static void main(String[] args) throws Exception {
-        if (args.length != 3) throw new IllegalArgumentException("input.steinmod YNYConfig.class output.steinmod");
+        if (args.length != 4) throw new IllegalArgumentException("input.steinmod YNYConfig.class ArmorLog.class output.steinmod");
         byte[] config;
         try (InputStream stream = new FileInputStream(args[1])) { config = stream.readAllBytes(); }
+        byte[] armorLog;
+        try (InputStream stream = new FileInputStream(args[2])) { armorLog = stream.readAllBytes(); }
         int armorCount = 0, configCount = 0;
         try (ZipInputStream in = new ZipInputStream(new FileInputStream(args[0]));
-             ZipOutputStream out = new ZipOutputStream(new FileOutputStream(args[2]))) {
+             ZipOutputStream out = new ZipOutputStream(new FileOutputStream(args[3]))) {
             ZipEntry entry;
             while ((entry = in.getNextEntry()) != null) {
                 ByteArrayOutputStream buffer = new ByteArrayOutputStream();
@@ -29,6 +31,8 @@ public final class RecoverArmorAndDefaults {
                 copy.setTime(entry.getTime());
                 out.putNextEntry(copy); out.write(bytes); out.closeEntry();
             }
+            out.putNextEntry(new ZipEntry(OWNER.substring(0, OWNER.lastIndexOf('/') + 1) + "ArmorLog.class"));
+            out.write(armorLog); out.closeEntry();
         }
         if (armorCount != 1 || configCount != 1) throw new IllegalStateException("missing AutoArmor or YNYConfig");
         System.out.println("AutoArmor timeout and config defaults patched");
@@ -40,8 +44,16 @@ public final class RecoverArmorAndDefaults {
         ClassNode node = new ClassNode();
         new ClassReader(compatible).accept(node, 0);
         node.version = ((bytes[6] & 255) << 8) | (bytes[7] & 255);
-        int timeoutCount = 0, cursorCount = 0, fallbackCount = 0, upgradeCount = 0;
+        int timeoutCount = 0, cursorCount = 0, fallbackCount = 0, upgradeCount = 0, logCount = 0;
         for (MethodNode method : node.methods) {
+            if (method.name.equals("log") && method.desc.equals("(Ljava/lang/String;)V")) {
+                for (AbstractInsnNode instruction : method.instructions.toArray()) {
+                    if (instruction instanceof MethodInsnNode call && call.owner.equals("com/yny/utils/core/DebugLog") && call.name.equals("write")) {
+                        call.owner = "com/yny/utils/modules/player/ArmorLog";
+                        logCount++;
+                    }
+                }
+            }
             if (method.name.equals("bestReplacement") && method.desc.equals("(ILzx;I)L" + OWNER + "$Choice;")) {
                 int stores = 0;
                 for (AbstractInsnNode instruction : method.instructions.toArray()) {
@@ -92,7 +104,7 @@ public final class RecoverArmorAndDefaults {
                 }
             }
         }
-        if (timeoutCount != 1 || cursorCount != 1 || fallbackCount != 1 || upgradeCount != 1) throw new IllegalStateException("unexpected armor sites: " + timeoutCount + "/" + cursorCount + "/" + fallbackCount + "/" + upgradeCount);
+        if (timeoutCount != 1 || cursorCount != 1 || fallbackCount != 1 || upgradeCount != 1 || logCount != 1) throw new IllegalStateException("unexpected armor sites: " + timeoutCount + "/" + cursorCount + "/" + fallbackCount + "/" + upgradeCount + "/" + logCount);
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         node.accept(writer);
         return writer.toByteArray();

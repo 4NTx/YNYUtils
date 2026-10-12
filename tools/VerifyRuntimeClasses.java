@@ -3,6 +3,7 @@ public final class VerifyRuntimeClasses {
         ClassLoader loader = ClassLoader.getSystemClassLoader();
         Class.forName("com.yny.utils.config.YNYConfig", false, loader);
         Class.forName("com.yny.utils.modules.player.AutoArmor", false, loader);
+        Class.forName("com.yny.utils.modules.player.ArmorLog", false, loader);
         Class.forName("com.yny.utils.modules.clanping.ClanPingHud", false, loader);
         Class.forName("com.yny.utils.modules.clanping.PingClanName", false, loader);
         Class.forName("com.yny.targethealth.TargetHealthElement", false, loader);

@@ -872,7 +872,7 @@ public final class AutoArmor {
    }
 
    private static void log(String var0) {
-      DebugLog.write("AutoArmor", var0);
+      ArmorLog.write("AutoArmor", var0);
    }
 
    private static final class Choice {

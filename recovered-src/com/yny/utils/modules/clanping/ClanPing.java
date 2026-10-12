@@ -3,6 +3,7 @@ package com.yny.utils.modules.clanping;
 import auh.a;
 import com.yny.utils.core.ToggleKey;
 import dev.xavier.stein.loader.api.Chat;
+import dev.xavier.stein.loader.api.Entities;
 import dev.xavier.stein.loader.api.ModContext;
 import dev.xavier.stein.loader.api.Relation;
 import dev.xavier.stein.loader.api.Relations;
@@ -495,7 +496,7 @@ public final class ClanPing {
                      bfl.w();
                      bfl.c(1.0F, 1.0F, 1.0F, 1.0F);
                      renderWorldLabel(
-                        "§c◆ ATACAR ESTE INIMIGO §7• " + this.active.targetName + this.worldMeta(),
+                        "§c◆ ATACAR ESTE INIMIGO §7• " + targetDisplayName(var3, this.active.targetName) + this.worldMeta(),
                         var3.s,
                         var3.t + var3.K + 0.65,
                         var3.u,
@@ -573,6 +574,14 @@ public final class ClanPing {
             -11149825
          );
       }
+   }
+
+   private static String targetDisplayName(Object entity, String fallback) {
+      try {
+         String display = Entities.displayName(entity);
+         if (display != null && !display.trim().isEmpty()) return display;
+      } catch (Throwable ignored) { }
+      return fallback;
    }
 
    private void renderEnemyLastKnownWaypoint(float var1) {

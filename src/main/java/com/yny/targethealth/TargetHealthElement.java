@@ -83,9 +83,9 @@ public final class TargetHealthElement implements HudElement {
       target = next;
       name = safeDisplayName(next);
       if (changed) DebugLog.state("DamageIndicator", "target", name);
-      float nextHealth = Math.max(0.0F, Entities.health(next));
+      float nextHealth = Math.max(0.0F, HealthEventLatch.health(Entities.health(next), next));
       float nextMaximum = Math.max(1.0F, Entities.maxHealth(next));
-      float nextAbsorption = Math.max(0.0F, Entities.absorption(next));
+      float nextAbsorption = Math.max(0.0F, HealthEventLatch.absorption(Entities.absorption(next), next));
       armorPoints = Math.max(0, Entities.armor(next));
       acceptHealth(nextHealth, nextMaximum, nextAbsorption, changed, System.currentTimeMillis());
       Object self = Entities.self();
@@ -99,6 +99,7 @@ public final class TargetHealthElement implements HudElement {
    public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
                                float newAbsorption) {
       if (entity == null || entity != target) return;
+      HealthEventLatch.record(entity, newHealth, newAbsorption);
       acceptHealth(Math.max(0.0F, newHealth), Math.max(1.0F, Entities.maxHealth(entity)),
               Math.max(0.0F, newAbsorption), false, System.currentTimeMillis());
    }

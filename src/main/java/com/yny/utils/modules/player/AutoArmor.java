@@ -583,9 +583,11 @@ public final class AutoArmor {
             }
             int candidatePiece = Inventory.armorPiece(candidate);
             String rejection = "eligible";
+            boolean emergencyReplacement = worn == null || isBroken(worn);
+            boolean allowUnenchanted = emergencyReplacement || !ignoreUnenchanted.getAsBoolean();
             if (candidatePiece != piece) rejection = "wrong-piece:" + candidatePiece;
             else if (isBroken(candidate)) rejection = "broken";
-            else if (ignoreUnenchanted.getAsBoolean() && !candidate.isItemEnchanted()) rejection = "unenchanted";
+            else if (!allowUnenchanted && !candidate.isItemEnchanted()) rejection = "unenchanted";
             else if ((worn == null || isBroken(worn)) && !useDamagedReserves.getAsBoolean()
                     && durabilityPercent(candidate) < 100) rejection = "damaged-reserve-disabled";
             else if (preventive && isPreventiveUpgrade(candidate, worn)) rejection = "preventive-upgrade";
@@ -601,10 +603,9 @@ public final class AutoArmor {
             if (candidatePiece != piece || isBroken(candidate)) {
                 continue;
             }
-            if (ignoreUnenchanted.getAsBoolean() && !candidate.isItemEnchanted()) {
+            if (!allowUnenchanted && !candidate.isItemEnchanted()) {
                 continue;
             }
-            boolean emergencyReplacement = worn == null || isBroken(worn);
             if (emergencyReplacement && !useDamagedReserves.getAsBoolean()
                     && durabilityPercent(candidate) < 100) {
                 continue;

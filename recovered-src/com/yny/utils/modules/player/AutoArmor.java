@@ -638,7 +638,7 @@ public final class AutoArmor {
                var12 = "wrong-piece:" + var11;
             } else if (isBroken(var10)) {
                var12 = "broken";
-            } else if (this.ignoreUnenchanted.getAsBoolean() && !var10.w()) {
+            } else if ((var2 != null && !isBroken(var2)) && this.ignoreUnenchanted.getAsBoolean() && !var10.w()) {
                var12 = "unenchanted";
             } else if ((var2 == null || isBroken(var2)) && !this.useDamagedReserves.getAsBoolean() && durabilityPercent(var10) < 100) {
                var12 = "damaged-reserve-disabled";
@@ -668,7 +668,8 @@ public final class AutoArmor {
                .append(durabilityPercent(var10))
                .append("% reason=")
                .append(var12);
-            if (var11 == var1 && !isBroken(var10) && (!this.ignoreUnenchanted.getAsBoolean() || var10.w())) {
+            boolean allowUnenchanted = (var2 == null || isBroken(var2)) || !this.ignoreUnenchanted.getAsBoolean();
+            if (var11 == var1 && !isBroken(var10) && (allowUnenchanted || var10.w())) {
                boolean var13 = var2 == null || isBroken(var2);
                if (!var13 || this.useDamagedReserves.getAsBoolean() || durabilityPercent(var10) >= 100) {
                   AutoArmor.Choice var14 = new AutoArmor.Choice(var9, var10.k(), score(var10), isPreferred(var10, var7));

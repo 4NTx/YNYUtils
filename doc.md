@@ -24,19 +24,24 @@ Pedidos funcionais:
 
 ## Estado implementado nesta etapa
 
-O pacote instalado tem SHA-256 `00E23B0A670FD59665C9A666603B33A1AEF11262BC9CC2DE316B6E020E8D3BCF`. O mesmo hash está em `artifacts/`, `build/` e nas três instalações abaixo.
+O pacote instalado tem SHA-256 `8B6946E55754A0CFABD249F837BEFA22009F82578DA66E952B6F5B663B216E1E`. O mesmo hash está em `artifacts/`, `build/` e nas três instalações abaixo.
 
 Principais melhorias aplicadas nesta etapa:
 
-1. **AutoProtect Opção 2 (Toggle de Vida Baixa e Tecla de Atalho)**:
+1. **Auto Armor: Equipamento em Slot Vazio e Correção do Filtro de Descarte**:
+   - **Equipamento sem encantamento quando desprotegido**: Quando o jogador não possui armadura equipada na peça (`worn == null || isBroken(worn)`), o Auto Armor agora considera peças sem encantamento elegíveis para equipar imediatamente, evitando deixar o jogador desprotegido caso `autoArmorIgnoreUnenchanted` esteja ativado. Peças com encantamento continuam com maior prioridade de pontuação quando presentes.
+   - **Filtro de Armaduras Recebidas Robusto**: O `ArmorPickupFilter` agora utiliza diretamente a API oficial do SteinLoader `Stacks.isEnchanted(stack)` e `Stacks.enchantLevel(stack, 0)` (ID 0 = Proteção no 1.8.9), eliminando reflexão frágil.
+   - **Eliminação de Bloqueio Prematuro por Telas/Containers**: Peças de armadura recebidas (seja craftadas, retiradas de baús ou coletadas do chão) não são mais descartadas da fila ao abrir ou fechar telas ou ao receber `onWindowItems(0)`. O descarte seguro via `Inventory.drop(slot, true)` ocorre a 1 item por tick assim que o inventário estiver em estado seguro, registrando no log de debug.
+   - **Proteção de Armadura Equipada e Movimentação Interna**: O filtro rastreia instâncias conhecidas no inventário (`baseline`) e peças equipadas (`knownEquipped`), garantindo que itens reorganizados internamente ou desequipados não sejam descartados por engano.
+2. **AutoProtect Opção 2 (Toggle de Vida Baixa e Tecla de Atalho)**:
    - Adicionado `autoProtectLowHealthEnabled` (booleano, padrão `true`) permitindo ativar ou desligar a defesa automática por vida baixa sem remover os sliders de HP (`autoProtectLowHealth` e `autoProtectResumeHealth`).
    - Mantida a defesa automática ao abrir janela parado (`autoProtectWindow`).
    - Adicionada tecla configurável `autoProtectToggleKey` (padrão `0` / "Nenhum") para alternar o AutoProtect sob demanda. Ao pressionar, alterna o módulo, notifica via Action Bar (`§aDefesa Automática: ATIVADA` / `§cDefesa Automática: DESATIVADA`), registra em log (`DebugLog`) e salva as configurações imediatamente. Se desligado durante a defesa, solta o bloqueio e restaura o slot anterior da hotbar.
-2. **Clan Ping: fluidez e interpolação contínua (anti-lag)**: O rastreamento de movimento do jogador inimigo marcado ("ATACAR ESTE INIMIGO") agora calcula a posição interpolada em tempo real via `prevPosX + (posX - prevPosX) * partialTicks`, alinhando perfeitamente a bounding box vermelha e o nametag 3D flutuante com a câmera em 144+ FPS. O engasgo causado por vetores de tick estáticos foi eliminado.
-3. **Clã do inimigo na marcação do mundo**: `PingClanName.display(entity, nick)` resolve o clã via `Players.group(nick)`, prefixo ou tag entre colchetes em Tab/displayName, formatando como `§7[CLÃ] §fNick` sem duplicar tags existentes e tratando sufixos de rank (`[VIP+]`, `[MVP++]`) e parênteses. `targetDisplayName` no `ClanPing` repassa a entidade para exibição imediata no nametag e na última posição conhecida.
-4. **50% de chance de hit em aliado e 0% no mesmo clã**: `HitThroughAllies` compilado com `--release 8` (bytecode 52). Membros do mesmo clã (`Relation.GROUP`) nunca recebem clique e 100% das vezes passam para o inimigo atrás; aliados (`Relation.ALLY`) passam por rolagem 50/50 preservando clique vanilla em 50% dos casos.
-5. **Damage Indicator e HUD**: Mantido o layout com altura dinâmica (32 px / 58 px), skins reais e nomes/vida ampliados em 1.15x.
-6. **Compatibilidade e Verificação**: Classes compiladas em Java 8 (`--release 8`). Verificado via `AutoProtectTest`, `AllyAttackFlowTest`, `PingClanNameTest`, `TargetClanNameTest`, `TargetHudRendererTest`, `VerifyPackageLinks` (54 classes, 3551 links), `VerifyRuntimeClasses` com `-Xverify:all`, `run.ps1` e `CheckPackConflicts.ps1`.
+3. **Clan Ping: fluidez e interpolação contínua (anti-lag)**: O rastreamento de movimento do jogador inimigo marcado ("ATACAR ESTE INIMIGO") agora calcula a posição interpolada em tempo real via `prevPosX + (posX - prevPosX) * partialTicks`, alinhando perfeitamente a bounding box vermelha e o nametag 3D flutuante com a câmera em 144+ FPS. O engasgo causado por vetores de tick estáticos foi eliminado.
+4. **Clã do inimigo na marcação do mundo**: `PingClanName.display(entity, nick)` resolve o clã via `Players.group(nick)`, prefixo ou tag entre colchetes em Tab/displayName, formatando como `§7[CLÃ] §fNick` sem duplicar tags existentes e tratando sufixos de rank (`[VIP+]`, `[MVP++]`) e parênteses. `targetDisplayName` no `ClanPing` repassa a entidade para exibição imediata no nametag e na última posição conhecida.
+5. **50% de chance de hit em aliado e 0% no mesmo clã**: `HitThroughAllies` compilado com `--release 8` (bytecode 52). Membros do mesmo clã (`Relation.GROUP`) nunca recebem clique e 100% das vezes passam para o inimigo atrás; aliados (`Relation.ALLY`) passam por rolagem 50/50 preservando clique vanilla em 50% dos casos.
+6. **Damage Indicator e HUD**: Mantido o layout com altura dinâmica (32 px / 58 px), skins reais e nomes/vida ampliados em 1.15x.
+7. **Compatibilidade e Verificação**: Classes compiladas em Java 8 (`--release 8`). Verificado via `AutoArmorSafetyTest` (25 verificações), `ArmorPickupFilterTest`, `AutoProtectTest`, `AllyAttackFlowTest`, `PingClanNameTest`, `TargetClanNameTest`, `TargetHudRendererTest`, `VerifyPackageLinks` (54 classes, 3556 links), `VerifyRuntimeClasses` com `-Xverify:all` e `CheckPackConflicts.ps1`.
 
 
 ## Instalações e ambiente

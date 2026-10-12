@@ -133,10 +133,10 @@ java -jar ..\stein-sdk-tool\v0.2.0\stein-sdk.jar build
 Regressões headless, depois do build: `powershell -File tests\run.ps1`.
 Os dublês de teste não são incluídos no `.steinmod`.
 
-O indicador atualiza vida pelo evento `onHealthChanged` e também a relê a cada tick; anima a barra e mantém um rastro breve quando a vida cai. Item na mão, quatro peças da armadura, durabilidade, distância e nome exibido pelo cliente são relidos enquanto o alvo está selecionado. Ícones, nomes e durabilidade vêm dos `ItemStack`s que o cliente recebeu. Se o servidor não sincronizar um slot, a HUD indica que ele está vazio ou sem dados; não estima durabilidade. `DEFESA` mostra o valor agregado disponível no cliente como conferência, que também depende da sincronização do servidor.
+O indicador atualiza vida pelo evento `onHealthChanged` e também a relê a cada tick; anima a barra e mantém um rastro breve quando a vida cai. A HUD ajusta sua altura dinamicamente (32 px quando o alvo não possui itens, 58 px quando possui equipamentos), evitando espaços vazios no rodapé. A cabeça renderiza a skin real do jogador com camada 3D de chapéu/cabelo; o nome e a vida numérica são desenhados ampliados (1.15x) para rápida leitura em combate. Peças de armadura e item na mão exibem ícones e durabilidades centrados somente para os itens que realmente existem.
 
 ## Ataque e aliados
 
-Quando `50% no primeiro aliado; grupo/clã sempre ignorado` está ativo, o mesmo clã (`GROUP`) é sempre ignorado. Para o primeiro aliado de outra relação (`ALLY`) no raio antes de uma parede, o cliente faz uma rolagem de 50%: se passar, ataca esse aliado; caso contrário, segue até o primeiro alvo não amigável. Aliados adicionais não geram novas rolagens. Com a opção desligada, o ataque vanilla é mantido.
+Quando `50% no primeiro aliado; grupo/clã sempre ignorado` está ativo, o mesmo clã (`GROUP`) é sempre ignorado. Se o jogador clicar diretamente em um aliado de outra relação (`ALLY`), o cliente faz uma rolagem de 50% nesse clique: se passar, preserva o ataque original; caso contrário, busca o primeiro inimigo no raio antes de uma parede. Um inimigo clicado diretamente mantém o ataque normal. A chance decide qual ataque o cliente tenta; o dano ainda depende do servidor. Com a opção desligada, o ataque vanilla é mantido.
 
 A rolagem usa `ThreadLocalRandom.nextBoolean()` uma vez no primeiro ALLY, sem espera nem ação de rede. O evento e o resultado são registrados de forma assíncrona no log de combate.

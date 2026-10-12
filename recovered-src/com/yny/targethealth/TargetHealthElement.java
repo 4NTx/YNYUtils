@@ -231,50 +231,17 @@ public final class TargetHealthElement implements HudElement {
    }
 
    public int width() {
-      int base = template() == 2 ? 104 : template() == 3 ? 88 : 132;
-      int nameWidth = TargetHealthMod.settings.showName ? Render.textWidth(name) : 0;
-      int valueWidth = TargetHealthMod.settings.showNumbers ? Render.textWidth(healthText) : 0;
-      int width = Math.max(base, nameWidth + valueWidth + (valueWidth > 0 && nameWidth > 0 ? 14 : 8));
-      if (TargetHealthMod.settings.showHeldItem) {
-         width = Math.max(width, 29 + Render.textWidth(heldName) +
-                 (TargetHealthMod.settings.showDistance ? Render.textWidth(distanceText) + 16 : 8));
-      } else if (TargetHealthMod.settings.showDistance) {
-         width = Math.max(width, Render.textWidth(distanceText) + 14);
-      }
-      if (TargetHealthMod.settings.showArmorDurability) {
-         width = Math.max(width, MIN_WIDTH);
-         for (int i = 0; i < armor.length; i++) {
-            if (armor[i] != null) {
-               String line = ARMOR_LABELS[i] + " " + safeStackName(armor[i]) + " · " + durability(armor[i]);
-               width = Math.max(width, 32 + Render.textWidth(line));
-            }
-         }
-      }
-      return Math.max(MIN_WIDTH, width);
-   }
-
-   private int baseHeight() {
-      int value = template();
-      return value == 1 ? 35 : value == 2 || value == 3 ? 20 : 31;
+      return TargetHudRenderer.getWidth();
    }
 
    public int height() {
-      return baseHeight() + (TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance ? 34 : 0)
-              + (TargetHealthMod.settings.showArmorDurability ? 78 : 0);
+      return TargetHudRenderer.getHeight(this.target, this.armor, this.heldItem);
    }
 
    public void draw(boolean alignRight, float partialTicks) {
-      int width = width();
-      int x = alignRight ? -width : 0;
-      int style = template();
-      int accent = 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor);
-      Render.roundRect(x, 0, width, height(), 4.0F, backgroundColor());
-      Render.rect(x, 0, width, 1, accent);
-      if (style == 1) drawHearts(x, width);
-      else if (style == 2) drawCompact(x, width);
-      else if (style == 3) drawMinimal(x, width);
-      else drawClassic(x, width);
-      drawEquipment(x, width);
+      TargetHudRenderer.draw(alignRight, partialTicks, this.target, this.name, this.distanceText,
+              this.healthText, this.health, this.maximum, this.absorption, this.animatedHealth,
+              this.damageTrailHealth, this.armor, this.heldItem);
    }
 
    private void drawClassic(int x, int width) {

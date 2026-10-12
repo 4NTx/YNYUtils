@@ -212,7 +212,6 @@ public final class TargetHealthElement implements HudElement {
 
    public boolean layout(boolean preview, float partialTicks) {
       if (!TargetHealthMod.settings.enabled) return false;
-      updateTarget();
       if (target == null && !preview) return false;
       if (target == null) {
          name = "Jogador [Clã]";
@@ -226,25 +225,17 @@ public final class TargetHealthElement implements HudElement {
    }
 
    public int width() {
-      return MIN_WIDTH;
-   }
-
-   private int baseHeight() {
-      int value = template();
-      return value == 1 ? 35 : value == 2 || value == 3 ? 20 : 31;
+      return TargetHudRenderer.getWidth();
    }
 
    public int height() {
-      return 60;
+      return TargetHudRenderer.getHeight(this.target, this.armor, this.heldItem);
    }
 
    public void draw(boolean alignRight, float partialTicks) {
-      int width = width();
-      int x = alignRight ? -width : 0;
-      Render.roundRect(x, 0, width, height(), 4.0F, backgroundColor());
-      Render.rect(x, 0, width, 1, 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor));
-      drawClassic(x, width);
-      drawEquipment(x, width);
+      TargetHudRenderer.draw(alignRight, partialTicks, this.target, this.name, this.distanceText,
+              this.healthText, this.health, this.maximum, this.absorption, this.animatedHealth,
+              this.damageTrailHealth, this.armor, this.heldItem);
    }
 
    private void drawClassic(int x, int width) {

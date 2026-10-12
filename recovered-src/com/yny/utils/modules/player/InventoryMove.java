@@ -20,7 +20,7 @@ public final class InventoryMove {
          boolean var2 = sync(var1.t.Y) | sync(var1.t.aa) | sync(var1.t.Z) | sync(var1.t.ab) | sync(var1.t.ac) | sync(var1.t.ae);
          sync(var1.t.ad);
          if (var2) stopSwordBlocking(var1);
-         if (!this.useKeyReserved.getAsBoolean()) {
+         if (!this.useKeyReserved.getAsBoolean() && !AutoProtect.isControllingUseKey()) {
             boolean var3 = this.suspendUseWhileMoving.getAsBoolean() && shouldSuspendUse(var2);
             var1.t.ag.h = !var3 && avh.a(var1.t.ag);
          }

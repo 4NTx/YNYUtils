@@ -17,6 +17,7 @@ public final class VerifyRuntimeClasses {
         Class.forName("com.yny.targethealth.HealthEventLatch", false, loader);
         Class.forName("com.yny.targethealth.HealthEventLatch$Sample", false, loader);
         Class.forName("com.yny.targethealth.TargetGrace", false, loader);
+        Class.forName("com.yny.targethealth.TargetHudRenderer", false, loader);
         Object config = Class.forName("com.yny.utils.config.YNYConfig", true, loader).getConstructor().newInstance();
         if (!config.getClass().getField("autoProtectEnabled").getBoolean(config)
                 || !config.getClass().getField("pvpDiagnosticsEnabled").getBoolean(config)

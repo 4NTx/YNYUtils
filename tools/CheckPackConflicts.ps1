@@ -22,4 +22,9 @@ foreach ($gameDir in $gameDirs) {
     Write-Output "PASS: $(Split-Path $gameDir -Parent) - YNYUtils enabled, Combat conflicts off"
 }
 if (($hashes | Select-Object -Unique).Count -ne 1) { throw 'YNYUtils packages differ between game folders' }
+$artifactHash = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '..\artifacts\YNYUtils.steinmod') -Algorithm SHA256).Hash
+$buildHash = (Get-FileHash -LiteralPath (Join-Path $PSScriptRoot '..\build\YNYUtils.steinmod') -Algorithm SHA256).Hash
+if ($artifactHash -ne $hashes[0] -or $buildHash -ne $hashes[0]) {
+    throw 'Installed package, artifacts/, and build/ have different hashes'
+}
 Write-Output "PASS: installed YNYUtils SHA256=$($hashes[0])"

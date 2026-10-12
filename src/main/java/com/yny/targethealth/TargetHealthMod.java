@@ -10,7 +10,6 @@ public final class TargetHealthMod {
     static final String ID = "ynydamageindicator";
     private static final String[] RANGES = {"8 blocos", "16 blocos", "32 blocos", "48 blocos", "64 blocos"};
     private static final String[] OPACITIES = {"Baixa", "Média", "Alta", "Sólida"};
-    private static final String[] TEMPLATES = {"Clássico", "Corações", "Compacto", "Minimalista"};
     static Settings settings = new Settings();
     private static ModConfig<Settings> config;
 
@@ -39,15 +38,15 @@ public final class TargetHealthMod {
                 settings.showNumbers = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Exibir corações de absorção", () -> settings.showAbsorption, value -> {
+            .option(Option.toggle("Exibir absorção na barra de vida", () -> settings.showAbsorption, value -> {
                 settings.showAbsorption = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Exibir item da mão e durabilidade", () -> settings.showHeldItem, value -> {
+            .option(Option.toggle("Exibir item da mão", () -> settings.showHeldItem, value -> {
                 settings.showHeldItem = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Exibir armaduras e durabilidade", () -> settings.showArmorDurability, value -> {
+            .option(Option.toggle("Exibir peças de armadura e durabilidade", () -> settings.showArmorDurability, value -> {
                 settings.showArmorDurability = value;
                 config.saveSoon();
             }))
@@ -75,10 +74,6 @@ public final class TargetHealthMod {
                 settings.ignoreAllies = value;
                 config.saveSoon();
             }))
-            .option(Option.cycle("Aparência do indicador", TEMPLATES, () -> settings.templateIndex, value -> {
-                settings.templateIndex = value;
-                config.saveSoon();
-            }))
             .option(Option.color("Cor de destaque da HUD", () -> settings.accentColor, value -> {
                 settings.accentColor = value;
                 config.saveSoon();
@@ -101,4 +96,3 @@ public final class TargetHealthMod {
             });
     }
 }
-

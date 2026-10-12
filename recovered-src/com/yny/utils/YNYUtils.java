@@ -386,6 +386,10 @@ public final class YNYUtils implements SteinMod {
    }
 
    public boolean onAttackEntity(Object var1) {
+      if (this.hitThroughAllies.allowClickedAlly(var1)) {
+         this.autoConsumables.onAttack(var1);
+         return false;
+      }
       if (this.hitThroughAllies.shouldCancel(var1)) {
          Object var2 = this.hitThroughAllies.targetBehindAllies(var1);
          if (var2 != null) {

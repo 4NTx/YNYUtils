@@ -24,15 +24,15 @@ Pedidos funcionais:
 
 ## Estado implementado nesta etapa
 
-O pacote instalado tem SHA-256 `44F2F2E5ABFF0FB3333A9AAABE6A75CE4BCA46862FD07C8390C18F7EDC4604EF`. O mesmo hash está em `artifacts/`, `build/` e nas três instalações abaixo.
+O pacote instalado tem SHA-256 `241E438A52740AB406E8342361D5E6F20DFF4C6B45CD0C8C451708EC6CA92529`. O mesmo hash está em `artifacts/`, `build/` e nas três instalações abaixo.
 
 Principais melhorias aplicadas nesta etapa:
 
-1. **Damage Indicator: altura dinâmica e sem espaço vazio**: Quando o alvo está sem espada/mão e sem armadura, a HUD contrai para altura compacta (32 px) e oculta a fileira de equipamentos para não consumir espaço de tela nem deixar lacuna vazia no rodapé. Quando o alvo possui itens/armadura, a HUD expande para 58 px e renderiza centralizadas **apenas** as peças que realmente existem (sem traços "—" desnecessários).
-2. **Skin do jogador na cabeça**: Implementada renderização nativa via `Render.playerHead(skinName, headX, headY, headSize, true)` com o nick exato do alvo (e do próprio jogador no preview), corrigindo a ausência de skin causada pelo antigo desenho de retângulos fixos.
-3. **Nome e vida ampliados**: Nome do jogador e números de vida ("20 / 20") desenhados em escala 1.15x com sombra nítida para máxima legibilidade durante PvP; barra de vida (6 px) com animação suave de rastro de dano e sobreposição de absorção.
-4. **Limpeza de opções obsoletas**: Removido seletor inoperante de templates ("Aparência do indicador"), corrigido rótulo para "Exibir absorção na barra de vida" e refinados os textos das opções de equipamento.
-5. **Modularização em `TargetHudRenderer`**: Toda a lógica de renderização e cálculo foi compilada com `--release 8` (bytecode 52) em `TargetHudRenderer.java` e integrada ao `.steinmod`. Verificado via `TargetHudRendererTest`, `VerifyPackageLinks` (54 classes, 3507 links), `VerifyRuntimeClasses` com `-Xverify:all` e `CheckPackConflicts.ps1`.
+1. **Clan Ping: fluidez e interpolação contínua (anti-lag)**: O rastreamento de movimento do jogador inimigo marcado ("ATACAR ESTE INIMIGO") agora calcula a posição interpolada em tempo real via `prevPosX + (posX - prevPosX) * partialTicks`, alinhando perfeitamente a bounding box vermelha e o nametag 3D flutuante com a câmera em 144+ FPS. O engasgo causado por vetores de tick estáticos foi eliminado.
+2. **Clã do inimigo na marcação do mundo**: `PingClanName.display(entity, nick)` resolve o clã via `Players.group(nick)`, prefixo ou tag entre colchetes em Tab/displayName, formatando como `§7[CLÃ] §fNick` sem duplicar tags existentes. `targetDisplayName` no `ClanPing` repassa a entidade para exibição imediata no nametag e na última posição conhecida.
+3. **50% de chance de hit em aliado e 0% no mesmo clã**: `HitThroughAllies` compilado com `--release 8` (bytecode 52). Membros do mesmo clã (`Relation.GROUP`) nunca recebem clique e 100% das vezes passam para o inimigo atrás; aliados (`Relation.ALLY`) passam por rolagem 50/50 preservando clique vanilla em 50% dos casos.
+4. **Damage Indicator e HUD**: Mantido o layout com altura dinâmica (32 px / 58 px), skins reais e nomes/vida ampliados em 1.15x.
+5. **Compatibilidade e Verificação**: Classes compiladas em Java 8 (`--release 8`). Verificado via `AllyAttackFlowTest`, `PingClanNameTest`, `TargetClanNameTest`, `TargetHudRendererTest`, `VerifyPackageLinks` (54 classes, 3516 links), `VerifyRuntimeClasses` com `-Xverify:all`, `run.ps1` e `CheckPackConflicts.ps1`.
 
 
 ## Instalações e ambiente

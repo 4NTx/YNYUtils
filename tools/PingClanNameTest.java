@@ -6,6 +6,12 @@ public final class PingClanNameTest {
         expect("§b[ABC] Nick", PingClanName.format("Nick", "§b[ABC] Nick", "ABC"));
         expect("Nick", PingClanName.format("Nick", null, null));
         expect("§aOther", PingClanName.format("Nick", "§aOther", ""));
+        expect("§7[TREM] §fEnemy", PingClanName.format("Enemy", "Enemy", "[TREM]"));
+        expect("§c[TREM] Enemy", PingClanName.format("Enemy", "§c[TREM] Enemy", "TREM"));
+        expect("Alvo", PingClanName.format(null, null, null));
+        expect("Alvo", PingClanName.format("", "", ""));
+        expect("Alvo", PingClanName.display(null));
+        expect("Alvo", PingClanName.display(null, null));
         System.out.println("PASS: clan in enemy ping, no duplicate tag, fallback");
     }
 

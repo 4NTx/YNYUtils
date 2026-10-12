@@ -32,15 +32,23 @@ public final class GfxWorldMarkers {
             if (active == null || active.expired()) return true;
             if (active.enemy) {
                 Object target = Entities.player(active.targetName);
-                String name = PingClanName.display(active.targetName);
+                if (target == null) {
+                    for (Object p : Entities.players()) {
+                        if (active.targetName.equalsIgnoreCase(Entities.name(p))) {
+                            target = p;
+                            break;
+                        }
+                    }
+                }
+                String name = PingClanName.display(target, active.targetName);
                 if (target != null && Entities.isAlive(target)) {
                     outline.invoke(null, target, 0.025D, 0xFFFF4545);
-                    label.invoke(null, "ATACAR ESTE INIMIGO - " + name,
+                    label.invoke(null, "§c◆ ATACAR ESTE INIMIGO §7• " + name,
                             Entities.x(target, partialTicks), Entities.y(target, partialTicks) + 2.3D,
                             Entities.z(target, partialTicks), 1.0F, 0xFFFF6565, true);
                 } else {
                     ring.invoke(null, active.x, active.y + 0.05D, active.z, 0.65D, 0.035D, 0xFFFF4545);
-                    label.invoke(null, "ULTIMA POSICAO - " + name,
+                    label.invoke(null, "§c◆ ULTIMA POSICAO §7• " + name,
                             active.x, active.y + 2.0D, active.z, 1.0F, 0xFFFF8585, true);
                 }
             } else {

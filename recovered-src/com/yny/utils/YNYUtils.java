@@ -363,6 +363,7 @@ public final class YNYUtils implements SteinMod {
    }
 
    public void onRenderWorld(float var1) {
+      if (com.yny.utils.modules.clanping.GfxWorldMarkers.render(this.clanPing, var1)) return;
       this.clanPing.renderWorld(var1);
       this.allyGroundMarker.renderWorld(var1);
    }

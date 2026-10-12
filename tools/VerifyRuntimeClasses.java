@@ -6,6 +6,7 @@ public final class VerifyRuntimeClasses {
         Class.forName("com.yny.utils.modules.player.ArmorLog", false, loader);
         Class.forName("com.yny.utils.modules.StartupAudit", false, loader);
         Class.forName("com.yny.utils.modules.clanping.ClanPingHud", false, loader);
+        Class.forName("com.yny.utils.modules.clanping.GfxWorldMarkers", false, loader);
         Class.forName("com.yny.utils.modules.clanping.PingClanName", false, loader);
         Class.forName("com.yny.targethealth.TargetHealthElement", false, loader);
         Class.forName("com.yny.targethealth.DistanceLog", false, loader);

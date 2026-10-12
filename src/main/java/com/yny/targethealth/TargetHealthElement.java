@@ -81,7 +81,7 @@ public final class TargetHealthElement implements HudElement {
       EntityLivingBase next = (EntityLivingBase)candidate;
       boolean changed = next != target;
       target = next;
-      name = safeDisplayName(next);
+      name = TargetClanName.display(next);
       if (changed) DebugLog.state("DamageIndicator", "target", name);
       float nextHealth = Math.max(0.0F, HealthEventLatch.health(Entities.health(next), next));
       float nextMaximum = Math.max(1.0F, Entities.maxHealth(next));

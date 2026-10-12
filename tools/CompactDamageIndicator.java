@@ -23,6 +23,7 @@ import org.objectweb.asm.tree.MethodNode;
 import org.objectweb.asm.tree.VarInsnNode;
 import org.objectweb.asm.tree.FieldInsnNode;
 import org.objectweb.asm.tree.IntInsnNode;
+import org.objectweb.asm.tree.TypeInsnNode;
 
 /** Rebuilds the compact target HUD methods inside an already mapped .steinmod. */
 public final class CompactDamageIndicator {
@@ -207,7 +208,8 @@ public final class CompactDamageIndicator {
         i.add(new VarInsnNode(Opcodes.ILOAD, 3)); i.add(new InsnNode(Opcodes.ICONST_1));
         i.add(new MethodInsnNode(Opcodes.INVOKESTATIC, RENDER, "item", "(Ljava/lang/Object;IIZ)V", false));
         i.add(new VarInsnNode(Opcodes.ALOAD, 1));
-        i.add(new MethodInsnNode(Opcodes.INVOKESTATIC, OWNER, "durability", "(Ljava/lang/Object;)Ljava/lang/String;", false));
+        i.add(new TypeInsnNode(Opcodes.CHECKCAST, "zx"));
+        i.add(new MethodInsnNode(Opcodes.INVOKESTATIC, OWNER, "durability", "(Lzx;)Ljava/lang/String;", false));
         intConst(i, 40); i.add(new MethodInsnNode(Opcodes.INVOKESTATIC, RENDER, "trim", "(Ljava/lang/String;I)Ljava/lang/String;", false));
         i.add(new VarInsnNode(Opcodes.ILOAD, 2)); intConst(i, 1); i.add(new InsnNode(Opcodes.IADD)); i.add(new InsnNode(Opcodes.I2F));
         i.add(new VarInsnNode(Opcodes.ILOAD, 3)); intConst(i, 19); i.add(new InsnNode(Opcodes.IADD)); i.add(new InsnNode(Opcodes.I2F));

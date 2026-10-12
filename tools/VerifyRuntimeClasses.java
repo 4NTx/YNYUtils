@@ -12,8 +12,10 @@ public final class VerifyRuntimeClasses {
         Class.forName("com.yny.utils.modules.clanping.GfxWorldMarkers", false, loader);
         Class.forName("com.yny.utils.modules.clanping.PingClanName", false, loader);
         Class.forName("com.yny.targethealth.TargetHealthElement", false, loader);
+        Class.forName("com.yny.targethealth.TargetClanName", false, loader);
         Class.forName("com.yny.targethealth.DistanceLog", false, loader);
         Class.forName("com.yny.targethealth.HealthEventLatch", false, loader);
+        Class.forName("com.yny.targethealth.HealthEventLatch$Sample", false, loader);
         Class.forName("com.yny.targethealth.TargetGrace", false, loader);
         Object config = Class.forName("com.yny.utils.config.YNYConfig", true, loader).getConstructor().newInstance();
         if (!config.getClass().getField("autoProtectEnabled").getBoolean(config)
@@ -27,6 +29,11 @@ public final class VerifyRuntimeClasses {
         if (!"auto-protect".equals(group.invoke(null, "AutoProtect"))) {
             throw new AssertionError("AutoProtect log must have its own file");
         }
+        Class<?> latch = Class.forName("com.yny.targethealth.HealthEventLatch", true, loader);
+        Object target = new Object();
+        latch.getMethod("record", Object.class, float.class, float.class).invoke(null, target, 7.0f, 2.0f);
+        float health = (Float) latch.getMethod("health", float.class, Object.class).invoke(null, 20.0f, target);
+        if (health != 7.0f) throw new AssertionError("health callback latch did not retain event");
         System.out.println("PASS: patched runtime classes load and verify");
     }
 }

@@ -84,9 +84,7 @@ não descarta nada e mantém a peça atual no slot. Peças encantadas antigas s�
 preservadas nesse fluxo normal; o último recurso para cursor preso é separado.
 
 Usa a API de inventário do Stein, sem abrir telas nem mexer nos controles de
-movimento. O botão `Ligar/desligar Auto Armor`, a tecla selecionável, preferências
-de equipamento e notificações ficam no Panel/HUD do Stein. Desativado por padrão;
-as preferências são salvas na configuração.
+movimento. O botão `Ligar/desligar Auto Armor`, a tecla selecionável, preferências`r`nde equipamento e notificações ficam no Painel/HUD do Stein. O estado e as`r`npreferências são salvos na configuração.
 
 Durante uma troca preventiva, se o servidor devolver a peça antiga ao cursor,
 o módulo tenta guardá-la com o inventário fechado e o slot livre. Ele espera

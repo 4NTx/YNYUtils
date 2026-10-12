@@ -8,7 +8,7 @@ O pacote ativo `build/YNYUtils.steinmod` foi recuperado de `Modpack-11-10-26-VE 
 
 ## Ajuste do botão de aliados
 
-O pacote ativo foi atualizado para exibir **Ignorar aliados e atacar inimigo atrás** no painel PvP. A opção continua ligada ao campo hitThroughAlliesEnabled, já existente. O binário intacto do ZIP permanece em uild/YNYUtils-original-2026-10-11.steinmod; 	ools/RelabelAllyToggle.java documenta a alteração de bytecode. O cache do loader deve ser regenerado após fechar e reabrir o jogo.
+O pacote ativo foi atualizado para exibir **Ignorar aliados e atacar inimigo atrás** no painel PvP. A opção continua ligada ao campo `hitThroughAlliesEnabled`, já existente. O binário intacto do ZIP permanece em `build/YNYUtils-original-2026-10-11.steinmod`; `tools/RelabelAllyToggle.java` documenta a alteração de bytecode. O cache do loader deve ser regenerado após fechar e reabrir o jogo.
 
 
 ## Correção da cadeia de aliados

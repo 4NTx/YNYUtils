@@ -28,6 +28,10 @@ public final class YNYConfig {
    public volatile boolean autoConsumablesEnabled = true;
    public volatile boolean inventoryMoveEnabled = true;
    public volatile boolean inventoryMoveSuspendUse = true;
+   public volatile boolean autoProtectEnabled = true;
+   public volatile boolean autoProtectWindow = true;
+   public volatile int autoProtectLowHealth = 10;
+   public volatile int autoProtectResumeHealth = 14;
    public volatile int autoConsumablesToggleKey;
    public volatile boolean autoConsumablesStatusHudEnabled = true;
    public volatile int goldenAppleMode = 1;
@@ -54,6 +58,8 @@ public final class YNYConfig {
 
    public void sanitize() {
       this.inventoryMoveSuspendUse = true;
+      this.autoProtectLowHealth = Math.max(1, Math.min(16, this.autoProtectLowHealth));
+      this.autoProtectResumeHealth = Math.max(this.autoProtectLowHealth + 1, Math.min(20, this.autoProtectResumeHealth));
       this.knockbackPercent = Math.max(92, Math.min(100, this.knockbackPercent));
       this.autoArmorPreventiveThreshold = com.yny.utils.modules.player.ArmorThreshold.normalize(this.autoArmorPreventiveThreshold);
       this.autoArmorPreferredMaterial = Math.max(0, Math.min(5, this.autoArmorPreferredMaterial));

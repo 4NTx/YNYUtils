@@ -13,7 +13,7 @@ foreach ($gameDir in $gameDirs) {
     $hud = Get-Content -LiteralPath (Join-Path $gameDir 'config\steinloader-hud.json') -Raw | ConvertFrom-Json
     $enabled = @($combat.autoArmor, $combat.clanHitThrough, $combat.autoProtect, $combat.protectDefend)
     if ($enabled -contains $true) { throw "Conflicting Combat feature enabled: $gameDir" }
-    if (!$yny.autoArmorEnabled -or !$yny.hitThroughAlliesEnabled -or !$yny.pvpDiagnosticsEnabled -or
+    if (!$yny.autoArmorEnabled -or !$yny.autoProtectEnabled -or !$yny.hitThroughAlliesEnabled -or !$yny.pvpDiagnosticsEnabled -or
         !$yny.inventoryMoveSuspendUse -or !$yny.clanPingHudEnabled -or !$damage.enabled -or
         !$hud.elements.'ynyutils.clanping'.enabled -or !$hud.elements.'ynydamageindicator.target'.enabled) {
         throw "YNYUtils feature or HUD disabled: $gameDir"

@@ -10,6 +10,8 @@ import com.yny.utils.modules.player.ArmorThreshold;
 import com.yny.utils.modules.player.ArmorPickupOptions;
 import com.yny.utils.modules.player.ArmorPickupFilter;
 import com.yny.utils.modules.player.AutoConsumables;
+import com.yny.utils.modules.player.AutoProtect;
+import com.yny.utils.modules.player.AutoProtectOptions;
 import com.yny.utils.modules.player.InventoryMove;
 import com.yny.utils.modules.pvp.AllyGroundMarker;
 import com.yny.utils.modules.pvp.HitThroughAllies;
@@ -115,12 +117,14 @@ public final class YNYUtils implements SteinMod {
       ArmorPickupFilter.runAutoArmor(this.autoArmor, config);
       this.autoConsumables.onTickEnd();
       this.inventoryMove.onTickEnd();
+      AutoProtect.onTick(config, this.autoConsumables.isControllingUseKey());
       this.targetHealthElement.updateDistantTarget();
       this.targetHealthElement.updateTarget();
       this.clanPing.onTickEnd();
    }
 
    public void onShutdown() {
+      AutoProtect.reset();
       this.knockbackControl.reset();
       this.knockbackShiftReset.reset();
       this.knockbackJumpReset.reset();
@@ -130,6 +134,7 @@ public final class YNYUtils implements SteinMod {
    }
 
    public void onJoinGame() {
+      AutoProtect.reset();
       com.yny.utils.modules.StartupAudit.log(config);
       this.knockbackControl.requestInstallation();
       this.knockbackShiftReset.reset();
@@ -141,6 +146,7 @@ public final class YNYUtils implements SteinMod {
    }
 
    public void onDisconnected(String var1, String var2) {
+      AutoProtect.reset();
       this.knockbackControl.onDisconnected();
       this.knockbackShiftReset.reset();
       this.knockbackJumpReset.reset();
@@ -150,6 +156,7 @@ public final class YNYUtils implements SteinMod {
    }
 
    public void onPage(Page var1) {
+      AutoProtectOptions.add(var1, config, this.configStore);
       var1.title("YNYUtils")
          .icon("combat")
          .section("Ataque e aliados")

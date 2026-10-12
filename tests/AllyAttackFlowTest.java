@@ -43,7 +43,40 @@ public final class AllyAttackFlowTest {
         Ray wallBeforeGroup = new Ray(ray.hits, 0.5, 3);
         check(HitThroughAllies.firstHostileBeforeBlock(wallBeforeGroup, relations::get) == null,
                 "wall before friendly entities prevents redirection");
-        System.out.println("PASS: ally attack flow");
+
+        Object enemy2 = new Object();
+        relations.put(enemy2, Relation.ENEMY);
+        Ray twoEnemies = new Ray(Arrays.asList(new Hit(ally, 1.0, 0, 0, 0), new Hit(enemy, 2.0, 0, 0, 0), new Hit(enemy2, 2.5, 0, 0, 0)), 3, 3);
+        check(HitThroughAllies.firstHostileBeforeBlock(twoEnemies, relations::get) == enemy,
+                "first hostile behind ally is chosen, not distant hostiles");
+
+        Object neutral = new Object(), none = new Object();
+        relations.put(neutral, Relation.NEUTRAL);
+        relations.put(none, Relation.NONE);
+        Ray neutralRay = new Ray(Arrays.asList(new Hit(ally, 1.0, 0, 0, 0), new Hit(neutral, 2.0, 0, 0, 0)), 3, 3);
+        check(HitThroughAllies.firstHostileBeforeBlock(neutralRay, relations::get) == neutral,
+                "neutral target behind ally is treated as attackable target");
+
+        // Statistical distribution verification on live allowClickedAlly instance
+        HitThroughAllies hta = new HitThroughAllies(() -> true, () -> false);
+        check(!hta.allowClickedAlly(null), "null entity cannot be allowed");
+        check(!hta.shouldCancel(null), "null entity cannot be cancelled");
+        int allyHits = 0;
+        int groupHits = 0;
+        int enemyHits = 0;
+        int totalRolls = 2000;
+        for (int i = 0; i < totalRolls; i++) {
+            boolean roll = java.util.concurrent.ThreadLocalRandom.current().nextBoolean();
+            if (HitThroughAllies.keepOriginalAttack(true, Relation.ALLY, roll)) allyHits++;
+            if (HitThroughAllies.keepOriginalAttack(true, Relation.GROUP, roll)) groupHits++;
+            if (HitThroughAllies.keepOriginalAttack(true, Relation.ENEMY, roll)) enemyHits++;
+        }
+        check(groupHits == 0, "GROUP must never be hit (0% chance)");
+        check(enemyHits == 0, "keepOriginalAttack must not trigger on ENEMY");
+        double allyRate = (double) allyHits / totalRolls;
+        check(allyRate >= 0.44 && allyRate <= 0.56, "ALLY hit rate must be centered at 50% (got " + allyRate + ")");
+
+        System.out.println("PASS: ally attack flow (verified 0% group, ~50% ally [" + allyHits + "/" + totalRolls + "], 100% direct enemy, walls, chains)");
     }
 
     private static void check(boolean condition, String message) {

@@ -251,20 +251,27 @@ public final class PatchEnemyPingFluidity {
         method.instructions.insertBefore(augCCall, boxOffset);
 
         // Step 3: Interpolate coordinates passed to renderWorldLabel: replace wn.s, wn.t, wn.u with dload 15, 17, 19
+        int replacedCoords = 0;
         for (AbstractInsnNode insn : method.instructions.toArray()) {
             if (insn instanceof FieldInsnNode finsn && finsn.owner.equals("wn") && finsn.desc.equals("D")) {
                 AbstractInsnNode prev = finsn.getPrevious();
                 if (finsn.name.equals("s")) {
                     method.instructions.set(finsn, new VarInsnNode(Opcodes.DLOAD, 15));
                     if (prev != null && prev.getOpcode() == Opcodes.ALOAD) method.instructions.remove(prev);
+                    replacedCoords++;
                 } else if (finsn.name.equals("t")) {
                     method.instructions.set(finsn, new VarInsnNode(Opcodes.DLOAD, 17));
                     if (prev != null && prev.getOpcode() == Opcodes.ALOAD) method.instructions.remove(prev);
+                    replacedCoords++;
                 } else if (finsn.name.equals("u")) {
                     method.instructions.set(finsn, new VarInsnNode(Opcodes.DLOAD, 19));
                     if (prev != null && prev.getOpcode() == Opcodes.ALOAD) method.instructions.remove(prev);
+                    replacedCoords++;
                 }
             }
+        }
+        if (replacedCoords != 3) {
+            throw new IllegalStateException("Expected 3 coordinate replacements in renderWorld, got " + replacedCoords);
         }
 
         method.maxLocals = Math.max(method.maxLocals, 22);
@@ -285,6 +292,7 @@ public final class PatchEnemyPingFluidity {
     }
 
     private static void patchLastKnownMethod(MethodNode method) {
+        int patched = 0;
         for (AbstractInsnNode insn : method.instructions.toArray()) {
             if (insn instanceof FieldInsnNode finsn
                     && finsn.owner.equals("com/yny/utils/modules/clanping/ClanPing$Active")
@@ -293,8 +301,12 @@ public final class PatchEnemyPingFluidity {
                 method.instructions.insert(finsn, new MethodInsnNode(Opcodes.INVOKESTATIC,
                         "com/yny/utils/modules/clanping/PingClanName", "display",
                         "(Ljava/lang/String;)Ljava/lang/String;", false));
+                patched++;
                 break;
             }
+        }
+        if (patched != 1) {
+            throw new IllegalStateException("Failed to patch last known waypoint targetName, patched=" + patched);
         }
     }
 }

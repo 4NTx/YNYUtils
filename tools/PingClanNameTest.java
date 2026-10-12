@@ -8,11 +8,27 @@ public final class PingClanNameTest {
         expect("§aOther", PingClanName.format("Nick", "§aOther", ""));
         expect("§7[TREM] §fEnemy", PingClanName.format("Enemy", "Enemy", "[TREM]"));
         expect("§c[TREM] Enemy", PingClanName.format("Enemy", "§c[TREM] Enemy", "TREM"));
+        expect("§6[VIP] §c[TREM] Enemy", PingClanName.format("Enemy", "§6[VIP] §c[TREM] Enemy", "TREM"));
+        expect("[Lendario] [TREM] Enemy", PingClanName.format("Enemy", "[Lendario] [TREM] Enemy", "[TREM]"));
+        expect("[TREM] [VIP] Enemy", PingClanName.format("Enemy", "[TREM] [VIP] Enemy", "TREM"));
+        expect("Enemy [TREM]", PingClanName.format("Enemy", "Enemy [TREM]", "TREM"));
+        expect("§7[TREM] §f§eEnemy", PingClanName.format("Enemy", "§eEnemy", "TREM"));
         expect("Alvo", PingClanName.format(null, null, null));
         expect("Alvo", PingClanName.format("", "", ""));
         expect("Alvo", PingClanName.display(null));
         expect("Alvo", PingClanName.display(null, null));
-        System.out.println("PASS: clan in enemy ping, no duplicate tag, fallback");
+        expect("TREM", PingClanName.extractBracketTag("[VIP] [TREM] Nick"));
+        expect("TREM", PingClanName.extractBracketTag("[VIP+] [TREM] Nick"));
+        expect("TREM", PingClanName.extractBracketTag("[MVP++] [TREM] Nick"));
+        expect("TREM", PingClanName.extractBracketTag("[TREM] Nick"));
+        expect("VIP", PingClanName.extractBracketTag("[VIP] Nick"));
+        expect("VIP+", PingClanName.extractBracketTag("[VIP+] Nick"));
+        expect("TREM", PingClanName.extractBracketTag("(TREM) Nick"));
+        expect("TREM", PingClanName.extractBracketTag("[VIP+] (TREM) Nick"));
+        expect("(TREM) Nick", PingClanName.format("Nick", "(TREM) Nick", "TREM"));
+        expect("§6[VIP+] §c[TREM] Enemy", PingClanName.format("Enemy", "§6[VIP+] §c[TREM] Enemy", "TREM"));
+        if (PingClanName.extractBracketTag("Nick") != null) throw new AssertionError("expected null tag for plain nick");
+        System.out.println("PASS: clan in enemy ping, no duplicate tag, fallback, rank extraction");
     }
 
     private static void expect(String expected, String actual) {

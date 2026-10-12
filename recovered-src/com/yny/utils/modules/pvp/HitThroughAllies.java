@@ -42,7 +42,7 @@ public final class HitThroughAllies {
     public boolean shouldCancel(Object entity) {
         if (entity == null) return false;
         Relation relation = Relations.of(entity);
-        return shouldCancel(enabled.getAsBoolean(), relation.friendly());
+        return relation != null && shouldCancel(enabled.getAsBoolean(), relation.friendly());
     }
 
     static boolean shouldCancel(boolean active, boolean friendly) {

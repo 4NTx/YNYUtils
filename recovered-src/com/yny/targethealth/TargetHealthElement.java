@@ -1,0 +1,406 @@
+package com.yny.targethealth;
+
+import dev.xavier.stein.loader.api.Entities;
+import dev.xavier.stein.loader.api.HudElement;
+import dev.xavier.stein.loader.api.HudPlacement;
+import dev.xavier.stein.loader.api.Option;
+import dev.xavier.stein.loader.api.Relations;
+import dev.xavier.stein.loader.api.Render;
+import dev.xavier.stein.loader.api.Stacks;
+import dev.xavier.stein.loader.api.Targeting;
+import dev.xavier.stein.loader.api.Targeting.Hit;
+import dev.xavier.stein.loader.api.Targeting.Query;
+import dev.xavier.stein.loader.api.Targeting.Ray;
+import java.util.Locale;
+
+public final class TargetHealthElement implements HudElement {
+   private static final int MIN_WIDTH = 250;
+   private static final int BAR_HEIGHT = 6;
+   private static final double[] RANGES = new double[]{8.0D, 16.0D, 32.0D, 48.0D, 64.0D};
+   private static final int[] OPACITIES = new int[]{90, 130, 176, 220};
+   private static final String[] ARMOR_LABELS = new String[]{"CAP", "PEI", "CAL", "BOT"};
+   private Object target;
+   private String name = "Target";
+   private String healthText = "20 / 20";
+   private String heldName = "Mão vazia";
+   private String heldDurability = "";
+   private String distanceText = "";
+   private float health = 20.0F;
+   private float maximum = 20.0F;
+   private float absorption;
+   private int armorPoints;
+   private float animatedHealth = 20.0F;
+   private float damageTrailHealth = 20.0F;
+   private Object heldItem;
+   private final Object[] armor = new Object[4];
+   private Object distantTarget;
+   private int scanCooldown;
+   private long animationAt;
+
+   public void updateDistantTarget() {
+      Object self = Entities.self();
+      if (self == null || !TargetHealthMod.settings.showDistantTargets) {
+         distantTarget = null;
+         return;
+      }
+      Object direct = directTarget();
+      if (direct != null && !isIgnoredTarget(direct)) {
+         distantTarget = null;
+         scanCooldown = 0;
+         return;
+      }
+      if (scanCooldown > 0) {
+         scanCooldown--;
+         return;
+      }
+      double reach = range();
+      scanCooldown = reach >= 48.0D ? 3 : 1;
+      Query query = Targeting.query().reach(reach).living().margin(0.3D).cutAtBlock().exclude(self);
+      if (TargetHealthMod.settings.ignoreLeaves) {
+         query.passThrough(Targeting.FOLIAGE);
+      }
+      Ray ray = Targeting.raycast(query);
+      distantTarget = firstDisplayableTarget(ray);
+   }
+
+   public void updateTarget() {
+      Object next = findTarget();
+      if (next == null) {
+         target = null;
+         heldItem = null;
+         heldName = "Mão vazia";
+         heldDurability = "";
+         distanceText = "";
+         armorPoints = 0;
+         for (int i = 0; i < armor.length; i++) armor[i] = null;
+         advanceAnimation(System.currentTimeMillis());
+         return;
+      }
+
+      boolean changed = next != target;
+      target = next;
+      name = safeDisplayName(next);
+      float nextHealth = Math.max(0.0F, Entities.health(next));
+      float nextMaximum = Math.max(1.0F, Entities.maxHealth(next));
+      float nextAbsorption = Math.max(0.0F, Entities.absorption(next));
+      armorPoints = Math.max(0, Entities.armor(next));
+      acceptHealth(nextHealth, nextMaximum, nextAbsorption, changed, System.currentTimeMillis());
+      Object self = Entities.self();
+      distanceText = self == null ? "" : String.format(Locale.ROOT, "%.1fm", (double)Entities.distance(self, next));
+      readEquipment(next);
+   }
+
+   /** Receives the server-applied health update as well as polling it during HUD layout. */
+   public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
+                               float newAbsorption) {
+      if (entity == null || entity != target) return;
+      acceptHealth(Math.max(0.0F, newHealth), Math.max(1.0F, Entities.maxHealth(entity)),
+              Math.max(0.0F, newAbsorption), false, System.currentTimeMillis());
+   }
+
+   private void acceptHealth(float nextHealth, float nextMaximum, float nextAbsorption,
+                             boolean changed, long now) {
+      float priorHealth = health;
+      health = Math.min(nextHealth, nextMaximum);
+      maximum = nextMaximum;
+      absorption = nextAbsorption;
+      healthText = format(health) + " / " + format(maximum);
+      if (changed || animationAt == 0L) {
+         animatedHealth = health;
+         damageTrailHealth = health;
+         animationAt = now;
+      } else {
+         if (health < priorHealth) damageTrailHealth = Math.max(damageTrailHealth, animatedHealth);
+         if (health > priorHealth) {
+            animatedHealth = Math.max(animatedHealth, health);
+            damageTrailHealth = Math.max(damageTrailHealth, health);
+         }
+         advanceAnimation(now);
+      }
+   }
+
+   private void advanceAnimation(long now) {
+      if (animationAt == 0L) {
+         animationAt = now;
+         animatedHealth = health;
+         damageTrailHealth = health;
+         return;
+      }
+      float elapsed = Math.max(0.0F, Math.min(0.20F, (now - animationAt) / 1000.0F));
+      animationAt = now;
+      if (animatedHealth > health) animatedHealth = Math.max(health, animatedHealth - elapsed * 42.0F);
+      else if (animatedHealth < health) animatedHealth = Math.min(health, animatedHealth + elapsed * 70.0F);
+      if (animatedHealth >= health) damageTrailHealth = Math.max(health, damageTrailHealth - elapsed * 10.0F);
+   }
+
+   private void readEquipment(Object entity) {
+      heldItem = null;
+      heldName = "Mão vazia";
+      heldDurability = "";
+      for (int i = 0; i < armor.length; i++) armor[i] = null;
+      if (!(entity instanceof pr)) return;
+      pr living = (pr)entity;
+      heldItem = living.bA();
+      if (heldItem != null) {
+         heldName = safeStackName(heldItem);
+         heldDurability = durability(heldItem);
+      }
+      Object[] worn = living.as();
+      if (worn != null) {
+         // EntityLivingBase equipment order is boots, leggings, chestplate, helmet.
+         armor[0] = slot(worn, 3);
+         armor[1] = slot(worn, 2);
+         armor[2] = slot(worn, 1);
+         armor[3] = slot(worn, 0);
+      }
+   }
+
+   private static Object slot(Object[] items, int index) {
+      return index >= 0 && index < items.length ? items[index] : null;
+   }
+
+   private static String durability(Object stack) {
+      if (stack == null || !Stacks.isDamageable(stack)) return "Sem desgaste";
+      int max = Math.max(0, Stacks.maxDamage(stack));
+      if (max == 0) return "Sem desgaste";
+      int damage = Math.max(0, Math.min(max, Stacks.damage(stack)));
+      return (max - damage) + "/" + max;
+   }
+
+   private static String safeStackName(Object stack) {
+      try {
+         String value = Stacks.name(stack);
+         return value == null || value.trim().isEmpty() ? "Item" : value;
+      } catch (Throwable ignored) {
+         return "Item";
+      }
+   }
+
+   private static String safeDisplayName(Object entity) {
+      try {
+         String value = Entities.displayName(entity);
+         if (value != null && !value.trim().isEmpty()) return value;
+      } catch (Throwable ignored) { }
+      String value = Entities.name(entity);
+      return value == null || value.trim().isEmpty() ? "Alvo" : value;
+   }
+
+   private Object findTarget() {
+      Object direct = directTarget();
+      if (direct != null && !isIgnoredTarget(direct)) return direct;
+      return distantTarget != null && Entities.isAlive(distantTarget) && !isIgnoredTarget(distantTarget)
+              ? distantTarget : null;
+   }
+
+   private static Object directTarget() {
+      Object candidate = Targeting.pointedEntity();
+      Object self = Entities.self();
+      return candidate != null && candidate != self && Entities.isLiving(candidate) ? candidate : null;
+   }
+
+   private static Object firstDisplayableTarget(Ray ray) {
+      if (ray == null) return null;
+      for (Hit hit : ray.hits) {
+         if (hit.distance >= ray.blockDistance) break;
+         if (hit.entity != null && Entities.isLiving(hit.entity) && !isIgnoredTarget(hit.entity)) return hit.entity;
+      }
+      return null;
+   }
+
+   private static boolean isIgnoredTarget(Object entity) {
+      if (TargetHealthMod.settings.ignoreArmorStands && entity instanceof um) return true;
+      return TargetHealthMod.settings.ignoreAllies && Relations.of(entity).friendly();
+   }
+
+   public String id() { return TargetHealthMod.ID + ".target"; }
+   public String name() { return "Damage Indicator"; }
+
+   public boolean layout(boolean preview, float partialTicks) {
+      if (!TargetHealthMod.settings.enabled) return false;
+      updateTarget();
+      if (target == null && !preview) return false;
+      if (target == null) {
+         name = "Jogador [Clã]";
+         health = 14.0F; maximum = 20.0F; absorption = 0.0F;
+         armorPoints = 20;
+         animatedHealth = 13.3F; damageTrailHealth = 19.0F;
+         healthText = "14 / 20"; distanceText = "8.4m";
+         heldName = "Espada de diamante"; heldDurability = "1042/1561";
+      }
+      return true;
+   }
+
+   public int width() {
+      int base = template() == 2 ? 104 : template() == 3 ? 88 : 132;
+      int nameWidth = TargetHealthMod.settings.showName ? Render.textWidth(name) : 0;
+      int valueWidth = TargetHealthMod.settings.showNumbers ? Render.textWidth(healthText) : 0;
+      int width = Math.max(base, nameWidth + valueWidth + (valueWidth > 0 && nameWidth > 0 ? 14 : 8));
+      if (TargetHealthMod.settings.showHeldItem) {
+         width = Math.max(width, 29 + Render.textWidth(heldName) +
+                 (TargetHealthMod.settings.showDistance ? Render.textWidth(distanceText) + 16 : 8));
+      } else if (TargetHealthMod.settings.showDistance) {
+         width = Math.max(width, Render.textWidth(distanceText) + 14);
+      }
+      if (TargetHealthMod.settings.showArmorDurability) {
+         width = Math.max(width, MIN_WIDTH);
+         for (int i = 0; i < armor.length; i++) {
+            if (armor[i] != null) {
+               String line = ARMOR_LABELS[i] + " " + safeStackName(armor[i]) + " · " + durability(armor[i]);
+               width = Math.max(width, 32 + Render.textWidth(line));
+            }
+         }
+      }
+      return Math.max(MIN_WIDTH, width);
+   }
+
+   private int baseHeight() {
+      int value = template();
+      return value == 1 ? 35 : value == 2 || value == 3 ? 20 : 31;
+   }
+
+   public int height() {
+      return baseHeight() + (TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance ? 34 : 0)
+              + (TargetHealthMod.settings.showArmorDurability ? 78 : 0);
+   }
+
+   public void draw(boolean alignRight, float partialTicks) {
+      int width = width();
+      int x = alignRight ? -width : 0;
+      int style = template();
+      int accent = 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor);
+      Render.roundRect(x, 0, width, height(), 4.0F, backgroundColor());
+      Render.rect(x, 0, width, 1, accent);
+      if (style == 1) drawHearts(x, width);
+      else if (style == 2) drawCompact(x, width);
+      else if (style == 3) drawMinimal(x, width);
+      else drawClassic(x, width);
+      drawEquipment(x, width);
+   }
+
+   private void drawClassic(int x, int width) {
+      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 4, 0xFFFFFFFF, true);
+      if (TargetHealthMod.settings.showNumbers) {
+         Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 4,
+                 barColor(health / maximum), true);
+      }
+      drawBar(x + 3, 18, width - 6, BAR_HEIGHT);
+   }
+
+   private void drawHearts(int x, int width) {
+      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 8), x + 3, 4, 0xFFFFFFFF, true);
+      int trail = Math.min(10, (int)Math.ceil(10.0F * damageTrailHealth / maximum));
+      int filled = Math.min(10, (int)Math.ceil(10.0F * animatedHealth / maximum));
+      int color = barColor(health / maximum);
+      for (int i = 0; i < 10; i++) {
+         int heartColor = i < filled ? color : i < trail ? 0xFFFF625D : 0xFF49343A;
+         Render.text("❤", x + 3 + i * 12, 17, heartColor, true);
+      }
+      if (TargetHealthMod.settings.showNumbers) {
+         Render.text(healthText, x + 3, 27, 0xFFFFFFFF, true);
+      }
+   }
+
+   private void drawCompact(int x, int width) {
+      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 3, 0xFFFFFFFF, true);
+      if (TargetHealthMod.settings.showNumbers) {
+         Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 3, barColor(health / maximum), true);
+      }
+      drawBar(x + 3, 14, width - 6, 3);
+   }
+
+   private void drawMinimal(int x, int width) {
+      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 2, 0xFFFFFFFF, true);
+      if (TargetHealthMod.settings.showNumbers) {
+         Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 2, 0xFFFFFFFF, true);
+      }
+      drawBar(x + 3, 13, width - 6, 5);
+   }
+
+   private void drawBar(int x, int y, int width, int height) {
+      int actual = Math.round(width * ratio(animatedHealth, maximum));
+      int trail = Math.round(width * ratio(damageTrailHealth, maximum));
+      Render.rect(x, y, width, height, 0xFF382B32);
+      if (trail > actual) Render.rect(x + actual, y, trail - actual, height, 0xFFD54C55);
+      if (actual > 0) Render.rect(x, y, actual, height, barColor(health / maximum));
+      if (TargetHealthMod.settings.showAbsorption && absorption > 0.0F) {
+         int extra = Math.min(width - actual, Math.round(width * ratio(absorption, maximum)));
+         if (extra > 0) Render.rect(x + actual, y, extra, height, 0xFFE7BE43);
+      }
+   }
+
+   private void drawEquipment(int x, int width) {
+      int y = baseHeight();
+      if (TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance) {
+         Render.roundRect(x + 2, y + 1, width - 4, 31, 3.0F, 0x99101822);
+         if (TargetHealthMod.settings.showHeldItem && heldItem != null) {
+            Render.item(heldItem, x + 5, y + 4, true);
+            int labelX = x + 25;
+            int rightSpace = TargetHealthMod.settings.showDistance ? Render.textWidth(distanceText) + 13 : 5;
+            Render.text(Render.trim(heldName, Math.max(12, width - (labelX - x) - rightSpace)),
+                    labelX, y + 3, 0xFFFFFFFF, true);
+            Render.text(Render.trim(heldDurability, Math.max(16, width - (labelX - x) - rightSpace)),
+                    labelX, y + 16, 0xFFB7C5D4, false);
+         } else if (TargetHealthMod.settings.showHeldItem) {
+            Render.text("Mão: vazia", x + 6, y + 8, 0xFFB7C5D4, false);
+         }
+         if (TargetHealthMod.settings.showDistance && !distanceText.isEmpty()) {
+            Render.text("Dist. " + distanceText, x + width - Render.textWidth("Dist. " + distanceText) - 6,
+                    y + 4, 0xFFFFDA80, true);
+         }
+      }
+      if (TargetHealthMod.settings.showArmorDurability) {
+         int armorY = y + (TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance ? 34 : 1);
+         Render.roundRect(x + 2, armorY, width - 4, 76, 3.0F, 0x99101822);
+         Render.text("SET", x + 6, armorY + 2, 0xFF8FA4B8, true);
+         String defense = "DEFESA " + armorPoints;
+         Render.text(defense, x + width - Render.textWidth(defense) - 6, armorY + 2, 0xFFFFDA80, true);
+         for (int i = 0; i < armor.length; i++) {
+            int rowY = armorY + 14 + i * 15;
+            Object stack = armor[i];
+            if (stack != null) {
+               Render.item(stack, x + 6, rowY - 2, true);
+               String line = ARMOR_LABELS[i] + " " + safeStackName(stack) + " · " + durability(stack);
+               Render.text(Render.trim(line, width - 32), x + 27, rowY, 0xFFB7C5D4, false);
+            } else {
+               Render.text(ARMOR_LABELS[i], x + 8, rowY, 0xFF728194, true);
+               Render.text("Vazio · —", x + 40, rowY, 0xFF728194, false);
+            }
+         }
+      }
+   }
+
+   private static float ratio(float value, float max) {
+      return Math.max(0.0F, Math.min(value / Math.max(1.0F, max), 1.0F));
+   }
+
+   private static String format(float value) {
+      return value == Math.round(value) ? Integer.toString(Math.round(value)) : String.format(Locale.ROOT, "%.1f", value);
+   }
+
+   private static int template() {
+      return Math.max(0, Math.min(TargetHealthMod.settings.templateIndex, 3));
+   }
+
+   private static double range() {
+      int index = TargetHealthMod.settings.rangeIndex;
+      return RANGES[Math.max(0, Math.min(index, RANGES.length - 1))];
+   }
+
+   private static int backgroundColor() {
+      int index = Math.max(0, Math.min(TargetHealthMod.settings.opacityIndex, OPACITIES.length - 1));
+      return OPACITIES[index] << 24 | 0x101721;
+   }
+
+   private static int barColor(float percent) {
+      if (!TargetHealthMod.settings.dynamicHealthColor) {
+         return 0xFF000000 | Option.rgb(TargetHealthMod.settings.healthColor);
+      }
+      if (percent > 0.5F) return 0xFF45B85A;
+      if (percent > 0.25F) return 0xFFE0A93B;
+      return 0xFFCF4848;
+   }
+
+   public HudPlacement defaultPlacement() {
+      return new HudPlacement(1, 1, 0, 28, 1.0F, true, false);
+   }
+}

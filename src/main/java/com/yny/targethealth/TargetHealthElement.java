@@ -1,290 +1,362 @@
 package com.yny.targethealth;
 
-import java.util.Locale;
-
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.FontRenderer;
-import net.minecraft.client.gui.Gui;
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.util.MovingObjectPosition;
-
+import com.yny.utils.core.DebugLog;
+import dev.xavier.stein.loader.api.Entities;
 import dev.xavier.stein.loader.api.HudElement;
 import dev.xavier.stein.loader.api.HudPlacement;
 import dev.xavier.stein.loader.api.Option;
+import dev.xavier.stein.loader.api.Relations;
+import dev.xavier.stein.loader.api.Render;
+import dev.xavier.stein.loader.api.Stacks;
 import dev.xavier.stein.loader.api.Targeting;
+import dev.xavier.stein.loader.api.Targeting.Hit;
+import dev.xavier.stein.loader.api.Targeting.Query;
+import dev.xavier.stein.loader.api.Targeting.Ray;
+import java.util.Locale;
+import net.minecraft.entity.EntityLivingBase;
+import net.minecraft.entity.item.EntityArmorStand;
+import net.minecraft.item.ItemStack;
 
 public final class TargetHealthElement implements HudElement {
+   private static final int MIN_WIDTH = 250;
+   private static final int BAR_HEIGHT = 6;
+   private static final double[] RANGES = new double[]{8.0D, 16.0D, 32.0D, 48.0D, 64.0D};
+   private static final int[] OPACITIES = new int[]{90, 130, 176, 220};
+   private static final String[] ARMOR_LABELS = new String[]{"CAP", "PEI", "CAL", "BOT"};
+   private EntityLivingBase target;
+   private String name = "Target";
+   private String healthText = "20 / 20";
+   private String heldName = "Mão vazia";
+   private String heldDurability = "";
+   private String distanceText = "";
+   private float health = 20.0F;
+   private float maximum = 20.0F;
+   private float absorption;
+   private int armorPoints;
+   private float animatedHealth = 20.0F;
+   private float damageTrailHealth = 20.0F;
+   private ItemStack heldItem;
+   private final ItemStack[] armor = new ItemStack[4];
+   private EntityLivingBase distantTarget;
+   private int scanCooldown;
+   private long animationAt;
 
-    private static final int WIDTH = 132;
-    private static final int HEIGHT = 31;
-    private static final int BAR_HEIGHT = 6;
-    private static final double[] RANGES = {8.0D, 16.0D, 32.0D, 48.0D, 64.0D};
-    private static final int[] OPACITIES = {90, 130, 176, 220};
+   public void updateDistantTarget() {
+      Object self = Entities.self();
+      if (self == null || !TargetHealthMod.settings.showDistantTargets) {
+         distantTarget = null;
+         return;
+      }
+      Object direct = directTarget();
+      if (direct != null && !isIgnoredTarget(direct)) {
+         distantTarget = null;
+         scanCooldown = 0;
+         return;
+      }
+      if (scanCooldown > 0) {
+         scanCooldown--;
+         return;
+      }
+      double reach = range();
+      scanCooldown = reach >= 48.0D ? 3 : 1;
+      Query query = Targeting.query().reach(reach).living().margin(0.3D).cutAtBlock().exclude(self);
+      if (TargetHealthMod.settings.ignoreLeaves) query.passThrough(Targeting.FOLIAGE);
+      distantTarget = firstDisplayableTarget(Targeting.raycast(query));
+   }
 
-    private EntityLivingBase target;
-    private String name = "Target";
-    private String healthText = "20 / 20";
-    private float health = 20.0F;
-    private float maximum = 20.0F;
-    private float absorption;
-    private EntityLivingBase distantTarget;
-    private int scanCooldown;
+   public void updateTarget() {
+      Object candidate = findTarget();
+      if (!(candidate instanceof EntityLivingBase)) {
+         if (target != null) DebugLog.state("DamageIndicator", "target", "none");
+         target = null;
+         heldItem = null;
+         heldName = "Mão vazia";
+         heldDurability = "";
+         distanceText = "";
+         armorPoints = 0;
+         for (int i = 0; i < armor.length; i++) armor[i] = null;
+         advanceAnimation(System.currentTimeMillis());
+         return;
+      }
+      EntityLivingBase next = (EntityLivingBase)candidate;
+      boolean changed = next != target;
+      target = next;
+      name = safeDisplayName(next);
+      if (changed) DebugLog.state("DamageIndicator", "target", name);
+      float nextHealth = Math.max(0.0F, Entities.health(next));
+      float nextMaximum = Math.max(1.0F, Entities.maxHealth(next));
+      float nextAbsorption = Math.max(0.0F, Entities.absorption(next));
+      armorPoints = Math.max(0, Entities.armor(next));
+      acceptHealth(nextHealth, nextMaximum, nextAbsorption, changed, System.currentTimeMillis());
+      Object self = Entities.self();
+      distanceText = self == null ? "" : String.format(Locale.ROOT, "%.1fm", (double)Entities.distance(self, next));
+      readEquipment(next);
+      DebugLog.state("DamageIndicator", "distance", distanceText);
+      DebugLog.state("DamageIndicator", "held", heldName + "; durability=" + heldDurability);
+      DebugLog.state("DamageIndicator", "armor", armorSummary());
+   }
 
-    public TargetHealthElement() {
-    }
+   public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
+                               float newAbsorption) {
+      if (entity == null || entity != target) return;
+      acceptHealth(Math.max(0.0F, newHealth), Math.max(1.0F, Entities.maxHealth(entity)),
+              Math.max(0.0F, newAbsorption), false, System.currentTimeMillis());
+   }
 
-    public void updateDistantTarget() {
-        Minecraft mc = Minecraft.getMinecraft();
-        if (mc.theWorld == null || mc.getRenderViewEntity() == null) {
-            distantTarget = null;
-            return;
-        }
-        if (!TargetHealthMod.settings.showDistantTargets) {
-            distantTarget = null;
-            return;
-        }
-        if (directTarget(mc) != null) {
-            distantTarget = null;
-            scanCooldown = 0;
-            return;
-        }
-        if (scanCooldown > 0) {
-            scanCooldown--;
-            return;
-        }
-        double range = range();
-        scanCooldown = range >= 48.0D ? 3 : 1;
-        Targeting.Query query = Targeting.query().reach(range).living().margin(0.3D)
-                .cutAtBlock().exclude(mc.thePlayer);
-        if (TargetHealthMod.settings.ignoreLeaves) {
-            query.passThrough(Targeting.FOLIAGE);
-        }
-        Targeting.Hit hit = Targeting.raycast(query).first();
-        distantTarget = hit != null && hit.entity instanceof EntityLivingBase
-                ? (EntityLivingBase) hit.entity : null;
-    }
+   private void acceptHealth(float nextHealth, float nextMaximum, float nextAbsorption,
+                             boolean changed, long now) {
+      float priorHealth = health;
+      health = Math.min(nextHealth, nextMaximum);
+      maximum = nextMaximum;
+      absorption = nextAbsorption;
+      healthText = format(health) + " / " + format(maximum);
+      if (Math.abs(health - priorHealth) > 0.01F) DebugLog.write("DamageIndicator", "health=" + format(priorHealth) + "->" + format(health) + "; max=" + format(maximum) + "; absorption=" + format(absorption));
+      if (changed || animationAt == 0L) {
+         animatedHealth = health;
+         damageTrailHealth = health;
+         animationAt = now;
+      } else {
+         if (health < priorHealth) damageTrailHealth = Math.max(damageTrailHealth, animatedHealth);
+         if (health > priorHealth) {
+            animatedHealth = Math.max(animatedHealth, health);
+            damageTrailHealth = Math.max(damageTrailHealth, health);
+         }
+         advanceAnimation(now);
+      }
+   }
 
-    void updateTarget() {
-        target = findTarget();
-        if (target == null) {
-            return;
-        }
-        name = target.getDisplayName().getUnformattedText();
-        float nextHealth = Math.max(0.0F, target.getHealth());
-        float nextMaximum = Math.max(1.0F, target.getMaxHealth());
-        float nextAbsorption = Math.max(0.0F, target.getAbsorptionAmount());
-        if (health != nextHealth || maximum != nextMaximum) {
-            healthText = format(nextHealth) + " / " + format(nextMaximum);
-        }
-        health = nextHealth;
-        maximum = nextMaximum;
-        absorption = nextAbsorption;
-    }
+   private void advanceAnimation(long now) {
+      if (animationAt == 0L) {
+         animationAt = now;
+         animatedHealth = health;
+         damageTrailHealth = health;
+         return;
+      }
+      float elapsed = Math.max(0.0F, Math.min(0.20F, (now - animationAt) / 1000.0F));
+      animationAt = now;
+      if (animatedHealth > health) animatedHealth = Math.max(health, animatedHealth - elapsed * 42.0F);
+      else if (animatedHealth < health) animatedHealth = Math.min(health, animatedHealth + elapsed * 70.0F);
+      if (animatedHealth >= health) damageTrailHealth = Math.max(health, damageTrailHealth - elapsed * 10.0F);
+   }
 
-    @Override
-    public String id() {
-        return TargetHealthMod.ID + ".target";
-    }
+   private void readEquipment(EntityLivingBase living) {
+      heldItem = living.getHeldItem();
+      heldName = heldItem == null ? "Mão vazia / sem dados" : safeStackName(heldItem);
+      heldDurability = heldItem == null ? "" : durability(heldItem);
+      for (int i = 0; i < armor.length; i++) armor[i] = living.getCurrentArmor(3 - i);
+   }
 
-    @Override
-    public String name() {
-        return "Vida do alvo";
-    }
+   private String armorSummary() {
+      StringBuilder value = new StringBuilder();
+      for (int i = 0; i < armor.length; i++) {
+         if (i > 0) value.append(" | ");
+         ItemStack stack = armor[i];
+         value.append(ARMOR_LABELS[i]).append("=").append(stack == null ? "empty" : safeStackName(stack) + "; durability=" + durability(stack));
+      }
+      return value.toString();
+   }
 
-    @Override
-    public boolean layout(boolean preview, float partialTicks) {
-        if (!TargetHealthMod.settings.enabled) {
-            return false;
-        }
-        updateTarget();
-        if (target == null && !preview) {
-            return false;
-        }
-        if (target == null) {
-            name = "Zombie";
-            health = 14.0F;
-            maximum = 20.0F;
-            absorption = 0.0F;
-            healthText = "14 / 20";
-        }
-        return true;
-    }
+   private static String durability(ItemStack stack) {
+      if (stack == null || !Stacks.isDamageable(stack)) return "Sem desgaste";
+      int max = Math.max(0, Stacks.maxDamage(stack));
+      if (max == 0) return "Sem desgaste";
+      int damage = Math.max(0, Math.min(max, Stacks.damage(stack)));
+      return (max - damage) + "/" + max;
+   }
 
-    private EntityLivingBase findTarget() {
-        Minecraft mc = Minecraft.getMinecraft();
-        EntityLivingBase direct = directTarget(mc);
-        return direct != null ? direct : distantTarget != null && !distantTarget.isDead ? distantTarget : null;
-    }
+   private static String safeStackName(ItemStack stack) {
+      try {
+         String value = Stacks.name(stack);
+         return value == null || value.trim().isEmpty() ? "Item" : value;
+      } catch (Throwable ignored) { return "Item"; }
+   }
 
-    private static EntityLivingBase directTarget(Minecraft mc) {
-        MovingObjectPosition hit = mc.objectMouseOver;
-        if (hit != null && hit.entityHit instanceof EntityLivingBase && hit.entityHit != mc.thePlayer) {
-            return (EntityLivingBase) hit.entityHit;
-        }
-        Entity entity = mc.pointedEntity;
-        if (entity instanceof EntityLivingBase && entity != mc.thePlayer) {
-            return (EntityLivingBase) entity;
-        }
-        return null;
-    }
+   private static String safeDisplayName(EntityLivingBase entity) {
+      try {
+         String value = Entities.displayName(entity);
+         if (value != null && !value.trim().isEmpty()) return value;
+      } catch (Throwable ignored) { }
+      String value = Entities.name(entity);
+      return value == null || value.trim().isEmpty() ? "Alvo" : value;
+   }
 
-    @Override
-    public int width() {
-        int template = template();
-        int base = template == 2 ? 104 : template == 3 ? 88 : WIDTH;
-        FontRenderer font = Minecraft.getMinecraft().fontRendererObj;
-        int textWidth = TargetHealthMod.settings.showName ? font.getStringWidth(name) + 6 : 0;
-        if (TargetHealthMod.settings.showNumbers) {
-            textWidth += font.getStringWidth(healthText) + 5;
-        }
-        return Math.max(base, textWidth);
-    }
+   private EntityLivingBase findTarget() {
+      Object direct = directTarget();
+      if (direct instanceof EntityLivingBase && !isIgnoredTarget(direct)) return (EntityLivingBase)direct;
+      return distantTarget != null && !distantTarget.isDead && !isIgnoredTarget(distantTarget) ? distantTarget : null;
+   }
 
-    @Override
-    public int height() {
-        int template = template();
-        return template == 1 ? 35 : template == 2 ? 20 : template == 3 ? 20 : HEIGHT;
-    }
+   private static Object directTarget() {
+      Object candidate = Targeting.pointedEntity();
+      Object self = Entities.self();
+      return candidate != null && candidate != self && Entities.isLiving(candidate) ? candidate : null;
+   }
 
-    @Override
-    public void draw(boolean alignRight, float partialTicks) {
-        Minecraft mc = Minecraft.getMinecraft();
-        FontRenderer font = mc.fontRendererObj;
-        int width = width();
-        int x = alignRight ? -width : 0;
-        int template = template();
-        if (template == 1) {
-            drawHearts(font, x, width);
-            return;
-        }
-        if (template == 2) {
-            drawCompact(font, x, width);
-            return;
-        }
-        if (template == 3) {
-            drawMinimal(font, x, width);
-            return;
-        }
+   private static EntityLivingBase firstDisplayableTarget(Ray ray) {
+      if (ray == null) return null;
+      for (Hit hit : ray.hits) {
+         if (hit.distance >= ray.blockDistance) break;
+         if (hit.entity instanceof EntityLivingBase && !isIgnoredTarget(hit.entity)) return (EntityLivingBase)hit.entity;
+      }
+      return null;
+   }
 
-        int barWidth = width() - 6;
-        Gui.drawRect(x, 0, x + width(), HEIGHT, backgroundColor());
-        Gui.drawRect(x, 0, x + width(), 1, 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor));
-        if (TargetHealthMod.settings.showName) {
-            font.drawStringWithShadow(name, x + 3, 4, 0xFFFFFF);
-        }
+   private static boolean isIgnoredTarget(Object entity) {
+      if (TargetHealthMod.settings.ignoreArmorStands && entity instanceof EntityArmorStand) return true;
+      return TargetHealthMod.settings.ignoreAllies && Relations.of(entity).friendly();
+   }
 
-        int barX = x + 3;
-        int barY = 18;
-        Gui.drawRect(barX, barY, barX + barWidth, barY + BAR_HEIGHT, 0xFF3B2020);
-        int filled = Math.round(barWidth * Math.min(health / maximum, 1.0F));
-        Gui.drawRect(barX, barY, barX + filled, barY + BAR_HEIGHT, barColor(health / maximum));
+   public String id() { return TargetHealthMod.ID + ".target"; }
+   public String name() { return "Damage Indicator"; }
 
-        if (TargetHealthMod.settings.showAbsorption && absorption > 0.0F) {
-            int absorptionWidth = Math.round(barWidth * Math.min(absorption / maximum, 1.0F));
-            Gui.drawRect(barX + filled, barY, Math.min(barX + barWidth, barX + filled + absorptionWidth),
-                    barY + BAR_HEIGHT, 0xFFE7BE43);
-        }
-        if (TargetHealthMod.settings.showNumbers) {
-            font.drawStringWithShadow(healthText, x + width() - 3 - font.getStringWidth(healthText), 4, 0xFFFFFF);
-        }
-    }
+   public boolean layout(boolean preview, float partialTicks) {
+      if (!TargetHealthMod.settings.enabled) return false;
+      updateTarget();
+      if (target == null && !preview) return false;
+      if (target == null) {
+         name = "Jogador [Clã]";
+         health = 14.0F; maximum = 20.0F; absorption = 0.0F;
+         armorPoints = 20;
+         animatedHealth = 13.3F; damageTrailHealth = 19.0F;
+         healthText = "14 / 20"; distanceText = "8.4m";
+         heldName = "Espada de diamante"; heldDurability = "1042/1561";
+      }
+      return true;
+   }
 
-    private static String format(float value) {
-        return value == Math.round(value) ? Integer.toString(Math.round(value))
-                : String.format(Locale.ROOT, "%.1f", value);
-    }
+   public int width() {
+      int base = template() == 2 ? 104 : template() == 3 ? 88 : 132;
+      int nameWidth = TargetHealthMod.settings.showName ? Render.textWidth(name) : 0;
+      int valueWidth = TargetHealthMod.settings.showNumbers ? Render.textWidth(healthText) : 0;
+      int width = Math.max(base, nameWidth + valueWidth + (valueWidth > 0 && nameWidth > 0 ? 14 : 8));
+      if (TargetHealthMod.settings.showHeldItem) {
+         width = Math.max(width, 29 + Render.textWidth(heldName) +
+                 (TargetHealthMod.settings.showDistance ? Render.textWidth(distanceText) + 16 : 8));
+      } else if (TargetHealthMod.settings.showDistance) width = Math.max(width, Render.textWidth(distanceText) + 14);
+      if (TargetHealthMod.settings.showArmorDurability) {
+         width = Math.max(width, MIN_WIDTH);
+         for (int i = 0; i < armor.length; i++) {
+            if (armor[i] != null) width = Math.max(width, 36 + Render.textWidth(ARMOR_LABELS[i] + " " + safeStackName(armor[i]) + " · " + durability(armor[i])));
+         }
+      }
+      return Math.max(MIN_WIDTH, width);
+   }
 
-    private static int healthColor(float percent) {
-        if (percent > 0.5F) return 0xFF45B85A;
-        if (percent > 0.25F) return 0xFFE0A93B;
-        return 0xFFCF4848;
-    }
+   private int baseHeight() {
+      int value = template();
+      return value == 1 ? 35 : value == 2 || value == 3 ? 20 : 31;
+   }
 
-    private void drawHearts(FontRenderer font, int x, int width) {
-        Gui.drawRect(x, 0, x + width, height(), backgroundColor());
-        Gui.drawRect(x, 0, x + width, 1, 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor));
-        if (TargetHealthMod.settings.showName) {
-            font.drawStringWithShadow(name, x + 3, 4, 0xFFFFFF);
-        }
-        int filled = Math.min(10, (int) Math.ceil(10.0F * health / maximum));
-        int color = barColor(health / maximum);
-        for (int index = 0; index < 10; index++) {
-            font.drawStringWithShadow("❤", x + 3 + index * 12, 17, index < filled ? color : 0xFF4A3030);
-        }
-        if (TargetHealthMod.settings.showAbsorption && absorption > 0.0F) {
-            int extra = Math.min(10 - filled, (int) Math.ceil(10.0F * absorption / maximum));
-            for (int index = 0; index < extra; index++) {
-                font.drawStringWithShadow("❤", x + 3 + (filled + index) * 12, 17, 0xFFE7BE43);
+   public int height() {
+      return baseHeight() + (TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance ? 34 : 0)
+              + (TargetHealthMod.settings.showArmorDurability ? 78 : 0);
+   }
+
+   public void draw(boolean alignRight, float partialTicks) {
+      int width = width();
+      int x = alignRight ? -width : 0;
+      int style = template();
+      Render.roundRect(x, 0, width, height(), 4.0F, backgroundColor());
+      Render.rect(x, 0, width, 1, 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor));
+      if (style == 1) drawHearts(x, width);
+      else if (style == 2) drawCompact(x, width);
+      else if (style == 3) drawMinimal(x, width);
+      else drawClassic(x, width);
+      drawEquipment(x, width);
+   }
+
+   private void drawClassic(int x, int width) {
+      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 4, 0xFFFFFFFF, true);
+      if (TargetHealthMod.settings.showNumbers) Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 4, barColor(health / maximum), true);
+      drawBar(x + 3, 18, width - 6, BAR_HEIGHT);
+   }
+
+   private void drawHearts(int x, int width) {
+      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 8), x + 3, 4, 0xFFFFFFFF, true);
+      int trail = Math.min(10, (int)Math.ceil(10.0F * damageTrailHealth / maximum));
+      int filled = Math.min(10, (int)Math.ceil(10.0F * animatedHealth / maximum));
+      int color = barColor(health / maximum);
+      for (int i = 0; i < 10; i++) Render.text("❤", x + 3 + i * 12, 17,
+              i < filled ? color : i < trail ? 0xFFFF625D : 0xFF49343A, true);
+      if (TargetHealthMod.settings.showNumbers) Render.text(healthText, x + 3, 27, 0xFFFFFFFF, true);
+   }
+
+   private void drawCompact(int x, int width) {
+      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 3, 0xFFFFFFFF, true);
+      if (TargetHealthMod.settings.showNumbers) Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 3, barColor(health / maximum), true);
+      drawBar(x + 3, 14, width - 6, 3);
+   }
+
+   private void drawMinimal(int x, int width) {
+      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 2, 0xFFFFFFFF, true);
+      if (TargetHealthMod.settings.showNumbers) Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 2, 0xFFFFFFFF, true);
+      drawBar(x + 3, 13, width - 6, 5);
+   }
+
+   private void drawBar(int x, int y, int width, int height) {
+      int actual = Math.round(width * ratio(animatedHealth, maximum));
+      int trail = Math.round(width * ratio(damageTrailHealth, maximum));
+      Render.rect(x, y, width, height, 0xFF382B32);
+      if (trail > actual) Render.rect(x + actual, y, trail - actual, height, 0xFFD54C55);
+      if (actual > 0) Render.rect(x, y, actual, height, barColor(health / maximum));
+      if (TargetHealthMod.settings.showAbsorption && absorption > 0.0F) {
+         int extra = Math.min(width - actual, Math.round(width * ratio(absorption, maximum)));
+         if (extra > 0) Render.rect(x + actual, y, extra, height, 0xFFE7BE43);
+      }
+   }
+
+   private void drawEquipment(int x, int width) {
+      int y = baseHeight();
+      boolean itemRow = TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance;
+      if (itemRow) {
+         Render.roundRect(x + 2, y + 1, width - 4, 31, 3.0F, 0x99101822);
+         if (TargetHealthMod.settings.showHeldItem && heldItem != null) {
+            Render.item(heldItem, x + 5, y + 4, true);
+            int labelX = x + 25;
+            int rightSpace = TargetHealthMod.settings.showDistance ? Render.textWidth("Dist. " + distanceText) + 13 : 5;
+            int labelWidth = Math.max(12, width - (labelX - x) - rightSpace);
+            Render.text(Render.trim(heldName, labelWidth), labelX, y + 3, 0xFFFFFFFF, true);
+            Render.text(Render.trim(heldDurability, labelWidth), labelX, y + 16, 0xFFB7C5D4, false);
+         } else if (TargetHealthMod.settings.showHeldItem) Render.text("Mão: vazia ou sem dados", x + 6, y + 8, 0xFFB7C5D4, false);
+         if (TargetHealthMod.settings.showDistance && !distanceText.isEmpty()) {
+            String distance = "Dist. " + distanceText;
+            Render.text(distance, x + width - Render.textWidth(distance) - 6, y + 4, 0xFFFFDA80, true);
+         }
+      }
+      if (TargetHealthMod.settings.showArmorDurability) {
+         int armorY = y + (itemRow ? 34 : 1);
+         Render.roundRect(x + 2, armorY, width - 4, 76, 3.0F, 0x99101822);
+         Render.text("SET", x + 6, armorY + 2, 0xFF8FA4B8, true);
+         String defense = "DEFESA " + armorPoints;
+         Render.text(defense, x + width - Render.textWidth(defense) - 6, armorY + 2, 0xFFFFDA80, true);
+         for (int i = 0; i < armor.length; i++) {
+            int rowY = armorY + 14 + i * 15;
+            ItemStack stack = armor[i];
+            if (stack != null) {
+               Render.item(stack, x + 6, rowY - 2, true);
+               String line = ARMOR_LABELS[i] + " " + safeStackName(stack) + " · " + durability(stack);
+               Render.text(Render.trim(line, width - 32), x + 27, rowY, 0xFFB7C5D4, false);
+            } else {
+               Render.text(ARMOR_LABELS[i], x + 8, rowY, 0xFF728194, true);
+               Render.text("Vazio ou sem dados · —", x + 40, rowY, 0xFF728194, false);
             }
-        }
-        if (TargetHealthMod.settings.showNumbers) {
-            font.drawStringWithShadow(healthText, x + 3, 27, 0xFFFFFF);
-        }
-    }
+         }
+      }
+   }
 
-    private void drawCompact(FontRenderer font, int x, int width) {
-        Gui.drawRect(x, 0, x + width, height(), backgroundColor());
-        Gui.drawRect(x, 0, x + width, 1, 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor));
-        String value = healthText;
-        int valueWidth = font.getStringWidth(value);
-        if (TargetHealthMod.settings.showName) {
-            font.drawStringWithShadow(name, x + 3, 4, 0xFFFFFF);
-        }
-        if (TargetHealthMod.settings.showNumbers) {
-            font.drawStringWithShadow(value, x + width - valueWidth - 3, 4, barColor(health / maximum));
-        }
-        int filled = Math.round((width - 6) * Math.min(health / maximum, 1.0F));
-        Gui.drawRect(x + 3, 15, x + width - 3, 17, 0xFF3B2020);
-        Gui.drawRect(x + 3, 15, x + 3 + filled, 17, barColor(health / maximum));
-        if (TargetHealthMod.settings.showAbsorption && absorption > 0.0F) {
-            int extra = Math.round((width - 6) * Math.min(absorption / maximum, 1.0F));
-            Gui.drawRect(x + 3 + filled, 15, Math.min(x + width - 3, x + 3 + filled + extra), 17, 0xFFE7BE43);
-        }
-    }
-
-    private void drawMinimal(FontRenderer font, int x, int width) {
-        int color = barColor(health / maximum);
-        int barY = 13;
-        int barHeight = 5;
-        int filled = Math.round(width * Math.min(health / maximum, 1.0F));
-        Gui.drawRect(x, 0, x + width, height(), backgroundColor());
-        Gui.drawRect(x, barY, x + filled, barY + barHeight, color);
-        if (TargetHealthMod.settings.showAbsorption && absorption > 0.0F) {
-            int extra = Math.round(width * Math.min(absorption / maximum, 1.0F));
-            Gui.drawRect(x + filled, barY, Math.min(x + width, x + filled + extra), barY + barHeight, 0xFFE7BE43);
-        }
-        Gui.drawRect(x, 0, x + width, 1, 0xFF000000 | Option.rgb(TargetHealthMod.settings.accentColor));
-        if (TargetHealthMod.settings.showName) {
-            font.drawStringWithShadow(name, x + 3, 2, 0xFFFFFF);
-        }
-        if (TargetHealthMod.settings.showNumbers) {
-            font.drawStringWithShadow(healthText, x + width - font.getStringWidth(healthText) - 3, 2, 0xFFFFFF);
-        }
-    }
-
-    private static int template() {
-        return Math.max(0, Math.min(TargetHealthMod.settings.templateIndex, 3));
-    }
-
-    private static double range() {
-        int index = TargetHealthMod.settings.rangeIndex;
-        return RANGES[Math.max(0, Math.min(index, RANGES.length - 1))];
-    }
-
-    private static int backgroundColor() {
-        int index = TargetHealthMod.settings.opacityIndex;
-        int alpha = OPACITIES[Math.max(0, Math.min(index, OPACITIES.length - 1))];
-        return alpha << 24 | 0x101010;
-    }
-
-    private static int barColor(float percent) {
-        return TargetHealthMod.settings.dynamicHealthColor ? healthColor(percent)
-                : 0xFF000000 | Option.rgb(TargetHealthMod.settings.healthColor);
-    }
-
-    @Override
-    public HudPlacement defaultPlacement() {
-        return new HudPlacement(1, 1, 0, 28, 1.0F, true, false);
-    }
+   private static float ratio(float value, float max) { return Math.max(0.0F, Math.min(value / Math.max(1.0F, max), 1.0F)); }
+   private static String format(float value) { return value == Math.round(value) ? Integer.toString(Math.round(value)) : String.format(Locale.ROOT, "%.1f", value); }
+   private static int template() { return Math.max(0, Math.min(TargetHealthMod.settings.templateIndex, 3)); }
+   private static double range() { int i = TargetHealthMod.settings.rangeIndex; return RANGES[Math.max(0, Math.min(i, RANGES.length - 1))]; }
+   private static int backgroundColor() { int i = Math.max(0, Math.min(TargetHealthMod.settings.opacityIndex, OPACITIES.length - 1)); return OPACITIES[i] << 24 | 0x101721; }
+   private static int barColor(float percent) {
+      if (!TargetHealthMod.settings.dynamicHealthColor) return 0xFF000000 | Option.rgb(TargetHealthMod.settings.healthColor);
+      if (percent > 0.5F) return 0xFF45B85A;
+      if (percent > 0.25F) return 0xFFE0A93B;
+      return 0xFFCF4848;
+   }
+   public HudPlacement defaultPlacement() { return new HudPlacement(1, 1, 0, 28, 1.0F, true, false); }
 }
+
+
+

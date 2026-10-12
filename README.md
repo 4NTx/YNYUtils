@@ -1,6 +1,8 @@
 # YNYUtils
 
-Base modular client-side para Minecraft 1.8.9 com Stein Loader/Stein SDK.
+Mod client-side para Minecraft 1.8.9 com Stein Loader.
+
+A versão funcional preservada está em `artifacts/YNYUtils.steinmod`. `recovered-src/` guarda a decompilação legível dessa versão; `src/main/java/` ainda deriva de uma base anterior e não representa sozinho todos os módulos ativos. Consulte `RECOVERY.md` antes de reconstruir o pacote.
 
 O ponto de entrada é `com.yny.utils.YNYUtils`, implementando exclusivamente
 `SteinMod`. A organização inicial reserva `core`, `modules`, `config` e `ui`
@@ -10,38 +12,31 @@ e requer a biblioteca Stein Loader 0.1.16 (instalador 0.1.23 ou mais recente).
 As preferências existentes permanecem em `config/ynyutils.json` e
 `config/ynydamageindicator.json`. Ambos usam `ModConfig` do SDK: valores
 inválidos voltam ao padrão campo a campo, e a gravação é atômica e agrupada.
+## Painel de configuração
 
-## Knockback Control
+As opções do painel estão agrupadas por tarefa: **Ataque e aliados**, **Knockback: escolha Shift Reset ou Jump Reset**, **Armadura e inventário**, **Consumíveis: maçãs e poções**, **Damage Indicator** e **Clan Ping**. Os rótulos dizem o efeito; ciclos mostram o comportamento de cada modo, e controles numéricos exibem unidade ou resultado.
 
-Intercepta somente `S12PacketEntityVelocity` destinado ao jogador local,
-antes de o manipulador vanilla aplicar `motionX`, `motionY` e `motionZ`.
-O Panel oferece ativação, uma tecla selecionável para alternar o módulo e
-velocidade recebida entre 93% e 100% (padrão: 100%). O valor mostra também a
-redução correspondente.
+- **Ataque e aliados:** a opção documenta a chance de 50% no primeiro aliado e que o mesmo grupo/clã é sempre ignorado.
+- **Knockback:** Shift Reset e Jump Reset são mutuamente exclusivos; ativar um desativa o outro.
+- **Armadura e inventário:** reposição, material, reservas, filtro de armaduras recebidas e movimento com inventário aberto ficam juntos. As opções de descarte indicam a condição e a salvaguarda.
+- **Consumíveis:** maçãs e poções têm modos independentes. Os modos diferenciam economia e combate, com tempos em segundos.
+- **Damage Indicator:** nome, vida, absorção, alvo, distância, mão, armadura e aparência ficam na seção do indicador.
+- **Clan Ping:** atalhos, duração, alcance, notificações e autorização ficam agrupados. O token é guardado no armazenamento de segredos do Stein.
 
-Opcionalmente, `Manter impulso vertical vanilla` aplica o percentual apenas
-em X/Z; Y permanece exatamente como veio no pacote. O `Jump Reset` é
-independente da redução: pode ficar ON com `Reduzir Knockback` OFF, caso em
-que o S12 inteiro permanece vanilla. `Pulinho ao receber KB no chão` é
-experimental e fica desligado por padrão: depois de um S12 local
-com impulso horizontal e vertical positivo, tenta um pulso de pulo normal
-somente se o jogador ainda estiver no chão. Não cria pulo no ar. Não atua
-em água, lava, teia, escadas, montarias, agachado ou com uma tela aberta;
-respeita a tecla de pulo manual e tem intervalo mínimo de 600 ms. Não gera
-ataques ou pacotes artificiais.
+Os nomes das propriedades JSON foram preservados para manter as configurações existentes. Preferências gerais ficam em `config/ynyutils.json`; as do Damage Indicator ficam em `config/ynydamageindicator.json`.
 
-`Logs detalhados KB/Capira/Pot` fica OFF por padrão. Quando ligado, registra
-em `logs/ynyutils-debug.log` os componentes vanilla/aplicados de cada S12
-local, a decisão do Jump Reset e os motivos de Auto Capira/Auto Pot esperarem,
-não encontrarem item na hotbar ou falharem no uso. O arquivo tem rotação
-limitada a aproximadamente 1 MB; desligue o diagnóstico depois do teste.
+## Knockback e resets
+
+O Knockback Control do pacote ativo aplica 92% do impulso recebido ao jogador local. O painel deixa os resets juntos: Shift Reset e Jump Reset são mutuamente exclusivos; ligar um desliga o outro. O Jump Reset só tenta pular após impulso recebido enquanto o jogador ainda está no chão e respeita a janela de estado definida pelo módulo.
+
+Os logs detalhados ficam ligados por padrão. A gravação é assíncrona e separada por módulo em `logs/ynyutils/`; arquivos com mais de 24 horas são removidos e o total é limitado a 32 MiB. O gravador descarta eventos se a fila limitada encher e registra um resumo de descartes.
 
 O interceptor é instalado uma vez por conexão, ao entrar no mundo. Mudanças
 seguidas de configuração ou keybind são agrupadas pelo SDK.
 
-Ao ativar ou desativar o Knockback Control, uma notificação temporária aparece.
+Ao ativar ou desativar os resets de knockback, uma notificação temporária pode aparecer.
 Ela pode ser movida, escalada ou ocultada pelo editor de HUD do Stein Loader.
-Ela também pode ser ligada ou desligada em `Mostrar notificação do KB` no Panel.
+As notificações dos módulos podem ser ocultadas nas opções de HUD correspondentes.
 
 O recurso Ataque Longo (Reach), incluindo diagnóstico, foi removido do mod
 ativo. O arquivo de trabalho anterior foi preservado localmente fora deste
@@ -100,10 +95,7 @@ os callbacks de cursor e destino e limita as tentativas. A opção de último re
 servidor, após três devoluções sem sucesso ou oito ticks sem slot livre; exige
 troca confirmada e nova peça equipada. Nunca descarta um cursor de origem incerta.
 Mudanças manuais no inventário desabilitam esse descarte para a troca em curso.
-O diagnóstico registra apenas transições e falhas, sem escrita a cada tick.
-`logs/ynyutils-debug.log` e o arquivo anterior `ynyutils-debug.1.log` são
-limitados a aproximadamente 1 MB cada; logs antigos acima desse limite são
-descartados na próxima escrita.
+Os registros de Auto Armor ficam em `logs/ynyutils/auto-armor-AAAA-MM-DD.log`; retenção e limite global são aplicados pelo gravador assíncrono.
 `tests/AutoArmorSafetyTest.java` cobre confirmações atrasadas/fora de ordem,
 cursor ocupado, janela aberta e destino incerto.
 
@@ -129,7 +121,9 @@ tentar novamente. Telas abertas e uso manual suspendem a automação.
 ## Compilação
 
 Requer JDK 25, Stein SDK 0.2.0 e Stein Loader instalado no jogo com a
-biblioteca 0.1.16 ou mais recente. Para preparar os mappings e compilar:
+biblioteca 0.1.16 ou mais recente. Atenção: `src/main/java/` ainda não reconstrói todos os módulos ativos. Leia `RECOVERY.md`; a versão funcional preservada está em `artifacts/YNYUtils.steinmod`. Não substitua esse artefato por um build direto até a recuperação das fontes estar completa.
+
+Para preparar os mappings e compilar:
 
 ```powershell
 java -jar ..\stein-sdk-tool\v0.2.0\stein-sdk.jar setup --mc ..\data\.minecraft
@@ -138,3 +132,11 @@ java -jar ..\stein-sdk-tool\v0.2.0\stein-sdk.jar build
 
 Regressões headless, depois do build: `powershell -File tests\run.ps1`.
 Os dublês de teste não são incluídos no `.steinmod`.
+
+O indicador atualiza vida pelo evento `onHealthChanged` e também a relê a cada tick; anima a barra e mantém um rastro breve quando a vida cai. Item na mão, quatro peças da armadura, durabilidade, distância e nome exibido pelo cliente são relidos enquanto o alvo está selecionado. Ícones, nomes e durabilidade vêm dos `ItemStack`s que o cliente recebeu. Se o servidor não sincronizar um slot, a HUD indica que ele está vazio ou sem dados; não estima durabilidade. `DEFESA` mostra o valor agregado disponível no cliente como conferência, que também depende da sincronização do servidor.
+
+## Ataque e aliados
+
+Quando `50% no primeiro aliado; grupo/clã sempre ignorado` está ativo, o mesmo clã (`GROUP`) é sempre ignorado. Para o primeiro aliado de outra relação (`ALLY`) no raio antes de uma parede, o cliente faz uma rolagem de 50%: se passar, ataca esse aliado; caso contrário, segue até o primeiro alvo não amigável. Aliados adicionais não geram novas rolagens. Com a opção desligada, o ataque vanilla é mantido.
+
+A rolagem usa `ThreadLocalRandom.nextBoolean()` uma vez no primeiro ALLY, sem espera nem ação de rede. O evento e o resultado são registrados de forma assíncrona no log de combate.

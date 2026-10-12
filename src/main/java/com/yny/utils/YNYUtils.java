@@ -62,6 +62,7 @@ public final class YNYUtils implements SteinMod {
         autoArmor.onTickEnd();
         autoConsumables.onTickEnd();
         targetHealthElement.updateDistantTarget();
+        targetHealthElement.updateTarget();
     }
 
     @Override
@@ -137,33 +138,33 @@ public final class YNYUtils implements SteinMod {
                             config.autoArmorStatusHudEnabled = value;
                             markConfigChanged();
                 }))
-                .option(Option.cycle("Material preferido", new String[] {
+                .option(Option.cycle("Material preferido para reposição", new String[] {
                         "Melhor disponível", "Diamante", "Ferro", "Malha", "Ouro", "Couro"
                 }, () -> config.autoArmorPreferredMaterial, value -> {
                     config.autoArmorPreferredMaterial = value;
                     markConfigChanged();
                 }))
-                .option(Option.slider("Troca preventiva abaixo de", 0, 50, 5,
+                .option(Option.slider("Repor armadura abaixo desta durabilidade", 0, 50, 5,
                         () -> config.autoArmorPreventiveThreshold, value -> {
                             config.autoArmorPreventiveThreshold = (int) value;
                             markConfigChanged();
                         }, value -> (int) value == 0 ? "Só quando quebrar" : (int) value + "% restante"))
-                .option(Option.toggle("Ignorar reservas sem encantamentos", () -> config.autoArmorIgnoreUnenchanted,
+                .option(Option.toggle("Usar somente reservas encantadas", () -> config.autoArmorIgnoreUnenchanted,
                         value -> {
                             config.autoArmorIgnoreUnenchanted = value;
                             markConfigChanged();
                         }))
-                .option(Option.toggle("Usar reservas danificadas se a armadura quebrar",
+                .option(Option.toggle("Aceitar reserva danificada se a peça quebrar",
                         () -> config.autoArmorUseDamagedReserves, value -> {
                             config.autoArmorUseDamagedReserves = value;
                             markConfigChanged();
                         }))
-                .option(Option.toggle("Descartar antiga sem encantamentos após troca confirmada",
+                .option(Option.toggle("Descartar peça antiga sem encantamentos após confirmar troca",
                         () -> config.autoArmorDropUnenchantedOld, value -> {
                             config.autoArmorDropUnenchantedOld = value;
                             markConfigChanged();
                 }))
-                .option(Option.toggle("Último recurso: descartar peça presa no cursor",
+                .option(Option.toggle("Último recurso: descartar peça antiga presa no cursor",
                         () -> config.autoArmorDropStuckOld, value -> {
                             config.autoArmorDropStuckOld = value;
                             markConfigChanged();
@@ -186,8 +187,8 @@ public final class YNYUtils implements SteinMod {
                             markConfigChanged();
                         }))
                 .option(Option.cycle("Maçã dourada", new String[] {
-                        "Desativada", "Econômico: novo dano + efeito expirado",
-                        "Combate: renovar perto do fim em PvP"
+                        "Desativada", "Econômico: após dano, quando o efeito acabar",
+                        "Combate: renovar efeito perto do fim"
                 }, () -> config.goldenAppleMode, value -> {
                     config.goldenAppleMode = value;
                     markConfigChanged();
@@ -198,32 +199,32 @@ public final class YNYUtils implements SteinMod {
                     config.goldenApplePreference = value;
                     markConfigChanged();
                 }))
-                .option(Option.slider("Intervalo mínimo entre maçãs (segurança)", 1, 30, 1,
+                .option(Option.slider("Pausa mínima entre usos de maçã", 1, 30, 1,
                         () -> config.goldenAppleCooldownSeconds, value -> {
                             config.goldenAppleCooldownSeconds = (int) value;
                             markConfigChanged();
                         }, value -> (int) value + " s"))
                 .option(Option.cycle("Poções de força/velocidade", new String[] {
-                        "Desativadas", "Econômico: novo dano + efeito expirado",
-                        "Combate: renovar perto do fim em PvP"
+                        "Desativadas", "Econômico: após dano, quando o efeito acabar",
+                        "Combate: renovar efeito perto do fim"
                 }, () -> config.potionMode, value -> {
                     config.potionMode = value;
                     markConfigChanged();
                 }))
-                .option(Option.toggle("Usar poção de força", () -> config.autoStrengthPotion, value -> {
+                .option(Option.toggle("Permitir poção de força", () -> config.autoStrengthPotion, value -> {
                     config.autoStrengthPotion = value;
                     markConfigChanged();
                 }))
-                .option(Option.toggle("Usar poção de velocidade", () -> config.autoSpeedPotion, value -> {
+                .option(Option.toggle("Permitir poção de velocidade", () -> config.autoSpeedPotion, value -> {
                     config.autoSpeedPotion = value;
                     markConfigChanged();
                 }))
-                .option(Option.slider("Combate: renovar quando restarem", 1, 10, 1,
+                .option(Option.slider("Combate: renovar efeito quando restarem", 1, 10, 1,
                         () -> config.potionRefreshSeconds, value -> {
                             config.potionRefreshSeconds = (int) value;
                             markConfigChanged();
                         }, value -> (int) value + " s"))
-                .option(Option.slider("Combate: tempo após último hit", 1, 15, 1,
+                .option(Option.slider("Combate: janela após último hit", 1, 15, 1,
                         () -> config.consumableCombatSeconds, value -> {
                             config.consumableCombatSeconds = (int) value;
                             markConfigChanged();
@@ -254,6 +255,7 @@ public final class YNYUtils implements SteinMod {
     @Override
     public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
             float newAbsorption) {
+        targetHealthElement.onHealthChanged(entity, oldHealth, newHealth, oldAbsorption, newAbsorption);
         if (entity == net.minecraft.client.Minecraft.getMinecraft().thePlayer) {
             autoConsumables.onHealthChanged(oldHealth, newHealth, oldAbsorption, newAbsorption);
         }
@@ -292,3 +294,6 @@ public final class YNYUtils implements SteinMod {
         configStore.saveSoon();
     }
 }
+
+
+

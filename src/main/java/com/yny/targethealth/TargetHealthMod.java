@@ -26,53 +26,73 @@ public final class TargetHealthMod {
     }
 
     public static void addOptions(Page page) {
-        page.section("Damage Indicator")
-            .option(Option.toggle("Ativar indicador", () -> settings.enabled, value -> {
+        page.section("Damage Indicator: vida e equipamento do alvo")
+            .option(Option.toggle("Exibir Damage Indicator: vida e equipamento do alvo", () -> settings.enabled, value -> {
                 settings.enabled = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Mostrar nome do alvo", () -> settings.showName, value -> {
+            .option(Option.toggle("Exibir nome do alvo", () -> settings.showName, value -> {
                 settings.showName = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Mostrar vida em números", () -> settings.showNumbers, value -> {
+            .option(Option.toggle("Exibir vida atual e máxima", () -> settings.showNumbers, value -> {
                 settings.showNumbers = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Mostrar absorção", () -> settings.showAbsorption, value -> {
+            .option(Option.toggle("Exibir corações de absorção", () -> settings.showAbsorption, value -> {
                 settings.showAbsorption = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Mostrar alvos distantes", () -> settings.showDistantTargets, value -> {
+            .option(Option.toggle("Exibir item da mão e durabilidade", () -> settings.showHeldItem, value -> {
+                settings.showHeldItem = value;
+                config.saveSoon();
+            }))
+            .option(Option.toggle("Exibir armaduras e durabilidade", () -> settings.showArmorDurability, value -> {
+                settings.showArmorDurability = value;
+                config.saveSoon();
+            }))
+            .option(Option.toggle("Exibir distância até o alvo", () -> settings.showDistance, value -> {
+                settings.showDistance = value;
+                config.saveSoon();
+            }))
+            .option(Option.toggle("Buscar alvos além da mira", () -> settings.showDistantTargets, value -> {
                 settings.showDistantTargets = value;
                 config.saveSoon();
             }))
-            .option(Option.cycle("Alcance visual", RANGES, () -> settings.rangeIndex, value -> {
+            .option(Option.cycle("Alcance máximo da busca visual", RANGES, () -> settings.rangeIndex, value -> {
                 settings.rangeIndex = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Ignorar folhagem", () -> settings.ignoreLeaves, value -> {
+            .option(Option.toggle("Ver através de folhagem", () -> settings.ignoreLeaves, value -> {
                 settings.ignoreLeaves = value;
                 config.saveSoon();
             }))
-            .option(Option.cycle("Estilo da HUD", TEMPLATES, () -> settings.templateIndex, value -> {
+            .option(Option.toggle("Ignorar manequins (armor stands)", () -> settings.ignoreArmorStands, value -> {
+                settings.ignoreArmorStands = value;
+                config.saveSoon();
+            }))
+            .option(Option.toggle("Não exibir aliados nem grupo/clã", () -> settings.ignoreAllies, value -> {
+                settings.ignoreAllies = value;
+                config.saveSoon();
+            }))
+            .option(Option.cycle("Aparência do indicador", TEMPLATES, () -> settings.templateIndex, value -> {
                 settings.templateIndex = value;
                 config.saveSoon();
             }))
-            .option(Option.color("Cor de destaque", () -> settings.accentColor, value -> {
+            .option(Option.color("Cor de destaque da HUD", () -> settings.accentColor, value -> {
                 settings.accentColor = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Cor de vida dinâmica", () -> settings.dynamicHealthColor, value -> {
+            .option(Option.toggle("Mudar cor conforme a vida", () -> settings.dynamicHealthColor, value -> {
                 settings.dynamicHealthColor = value;
                 config.saveSoon();
             }))
-            .option(Option.color("Cor da vida", () -> settings.healthColor, value -> {
+            .option(Option.color("Cor fixa da barra de vida", () -> settings.healthColor, value -> {
                 settings.healthColor = value;
                 settings.dynamicHealthColor = false;
                 config.saveSoon();
             }))
-            .option(Option.cycle("Opacidade do fundo", OPACITIES, () -> settings.opacityIndex, value -> {
+            .option(Option.cycle("Transparência do fundo", OPACITIES, () -> settings.opacityIndex, value -> {
                 settings.opacityIndex = value;
                 config.saveSoon();
             }))
@@ -81,3 +101,4 @@ public final class TargetHealthMod {
             });
     }
 }
+

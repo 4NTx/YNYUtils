@@ -7,7 +7,7 @@ public final class YNYConfig {
     public volatile int knockbackPercent = 100;
     public volatile boolean knockbackPreserveVertical;
     public volatile boolean knockbackJumpReset;
-    public volatile boolean pvpDiagnosticsEnabled;
+    public volatile boolean pvpDiagnosticsEnabled = true;
     public volatile int knockbackToggleKey;
     public volatile boolean knockbackStatusHudEnabled = true;
     public volatile boolean autoArmorEnabled;
@@ -50,3 +50,4 @@ public final class YNYConfig {
         goldenAppleCooldownSeconds = Math.max(1, Math.min(30, goldenAppleCooldownSeconds));
     }
 }
+

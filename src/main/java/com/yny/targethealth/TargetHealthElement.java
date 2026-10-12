@@ -65,7 +65,7 @@ public final class TargetHealthElement implements HudElement {
    }
 
    public void updateTarget() {
-      Object candidate = findTarget();
+      Object candidate = TargetGrace.choose(findTarget(), target);
       if (!(candidate instanceof EntityLivingBase)) {
          if (target != null) DebugLog.state("DamageIndicator", "target", "none");
          target = null;

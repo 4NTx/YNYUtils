@@ -10,6 +10,7 @@ public final class VerifyRuntimeClasses {
         Class.forName("com.yny.targethealth.TargetHealthElement", false, loader);
         Class.forName("com.yny.targethealth.DistanceLog", false, loader);
         Class.forName("com.yny.targethealth.HealthEventLatch", false, loader);
+        Class.forName("com.yny.targethealth.TargetGrace", false, loader);
         Object config = Class.forName("com.yny.utils.config.YNYConfig", true, loader).getConstructor().newInstance();
         if (!config.getClass().getField("pvpDiagnosticsEnabled").getBoolean(config)
                 || !config.getClass().getField("clanPingHudEnabled").getBoolean(config)) {

@@ -55,7 +55,8 @@ public final class ArmorPickupFilter {
     public static void onSlotChanged(int window, int slot, Object stack, YNYConfig config) {
         if (window != 0 || config == null || !config.autoArmorDiscardReceived) return;
         int index = Inventory.inventoryIndexOf(slot);
-        if (index < 9 || index >= 36) return; // NEVER touch hotbar (0-8)
+        if (index < 0 || index >= 36) return;
+        if (index == Inventory.selectedHotbar()) return; // Never discard active held item
         if (stack == null) {
             queued[index] = false;
             baseline[index] = null;
@@ -101,9 +102,11 @@ public final class ArmorPickupFilter {
             return false;
         }
 
-        // Scan slots 9 to 35 for unrecorded/newly received armor matching discard policy
-        // HOTBAR (slots 0-8) IS NEVER SCANNED OR DROPPED
-        for (int i = 9; i < 36; i++) {
+        // Scan slots 0 to 35 for newly received armor matching discard policy
+        // Active held item (selectedHotbar) is never queued or dropped
+        int heldSlot = Inventory.selectedHotbar();
+        for (int i = 0; i < 36; i++) {
+            if (i == heldSlot) continue;
             Object current = Inventory.stack(i);
             if (current == null) {
                 queued[i] = false;
@@ -126,7 +129,8 @@ public final class ArmorPickupFilter {
         }
 
         // Process at most 1 drop per tick for smooth execution without packet spam
-        for (int i = 9; i < 36; i++) {
+        for (int i = 0; i < 36; i++) {
+            if (i == heldSlot) continue;
             if (!queued[i]) continue;
             Object stack = Inventory.stack(i);
             if (stack == null || !reject(stack, config)) {

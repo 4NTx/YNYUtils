@@ -160,4 +160,33 @@ Após investigação aprofundada dos logs reais de jogo (`91.190.102.46:3838`) e
    - Validações: `VerifyPackageLinks` (54 classes, 3568 links internos), `VerifyRuntimeClasses` com `-Xverify:all`, `AutoArmorSafetyTest` (25 verificações), `ArmorPickupFilterTest`, `ArmorPickupPolicyTest`, `ArmorThresholdTest` e `ArmorPickupOptionsTest` aprovados.
    - Hash SHA-256 do pacote ativo: `40E4DAB1DB36CFC667C1C5933526E7FE9E314D0DF0D2F8C46371334969F2B21F` sincronizado em `artifacts/`, `build/` e nas três instalações do jogo via `tools/CheckPackConflicts.ps1`.
 
+## Resolução Completa das Falhas de AutoArmor e AutoConsumíveis ("Logs da Turma")
+
+Após análise exaustiva dos 4 arquivos de log da pasta `Logs da turma` (`ynyutils-debug (1).log`, `ynyutils-debug (2).log`, `ynyutils-debug.1 (1).log`, `ynyutils-debug.1 (2).log`), identificamos e corrigimos as falhas fundamentais:
+
+1. **Eliminação do Stall de 16 Ticks (800ms) no AutoArmor**:
+   - O servidor Spigot/Paper confirma `C0EPacketClickWindow` enviando `S32PacketConfirmTransaction(true)`, e não `S2FPacketSetSlot`. Logo, `onSlotChanged` nunca ocorria no sucesso e `serverConfirmed` ficava indefinidamente falso, forçando cada peça de armadura a esperar 16 ticks (800ms) até o timeout local (`fallback local após timeout`).
+   - **Correção**: Com `localApplied == true`, se `serverConfirmed || age >= 2`, o módulo agora conclui imediatamente em 2 ticks (100 ms) sem travamentos. O set de 4 peças é vestido em 0.4s em vez de 3.2s.
+
+2. **Equipamento Correto de Armadura na Hotbar (`source < 9 && worn == null`)**:
+   - No vanilla 1.8.9, `ContainerPlayer.transferStackInSlot` rejeita equipar armadura via `quickMove` (shift-click) a partir da hotbar (slots 36-44), causando time-outs em loop (`timeout sem troca coerente peitoral; source=2`).
+   - **Correção**: `AutoArmorHelper.performEquip` detecta quando a peça de origem está na hotbar e o corpo está desprovido, utilizando `Inventory.move(slotOf(source), slotOf(36 + piece))` diretamente. Em `compare`, o inventário principal (9-35) tem prioridade sobre a hotbar.
+
+3. **Pausa do AutoArmor Durante Alimentação e Telas**:
+   - O AutoArmor agora pausa quando `mc.thePlayer.isUsingItem()` é true, impedindo que cliques de inventário quebrem a alimentação/poção do jogador no servidor.
+   - O contador de idade `age` congela quando o jogador está navegando em baús/inventários.
+
+4. **Uso Contínuo de AutoConsumíveis sem Cancelamento por Input Polling**:
+   - O polling de mouse do Minecraft limpava `keyBindUseItem.pressed` nos ticks em que o mouse físico não estava pressionado, disparando `onStoppedUsingItem` prematuramente e causando `animação excedeu o limite de 48 ticks`.
+   - **Correção**: `ConsumableHelper.holdUseKey(true)` aciona `Keys.game(Keys.GameKey.USE).hold(true)` durante todo o consumo e libera com `hold(false)` no término.
+   - Se o slot anterior era o próprio consumível, a mão é restaurada para a espada (`_sword`) na hotbar.
+
+5. **Filtro de Descarte Abrangente (Slots 0-35)**:
+   - Monitoramento ampliado para toda a hotbar (0-8) e inventário (9-35), exceto o slot atualmente selecionado na mão (`selectedHotbar`), descartando armaduras lixo coletadas do chão pelo Minecraft.
+
+6. **Validação e Hashes**:
+   - Bytecode compilado em Java 8 (`--release 8`). Verificado via `VerifyPackageLinks` (56 classes, 3579 links internos), `VerifyRuntimeClasses` com `-Xverify:all`, testes unitários de segurança e `CheckPackConflicts.ps1`.
+   - Hash SHA-256 do pacote ativo: `ECA0AD76356DAC9E75FC510F18DDABAD102FADCFFEC5A1E9602CC315809695B0` sincronizado em `artifacts/`, `build/` e nas três instalações do jogo.
+
+
 

@@ -2,8 +2,10 @@ package com.yny.utils.modules.clanping;
 
 import dev.xavier.stein.loader.api.Entities;
 import dev.xavier.stein.loader.api.Players;
+import dev.xavier.stein.loader.api.Relation;
+import dev.xavier.stein.loader.api.Relations;
 
-/** Formats an enemy ping using the clan supplied by the client's player list. */
+/** Formats an enemy ping using the clan supplied by the client's player list and validates clan relations. */
 public final class PingClanName {
     private PingClanName() {}
 
@@ -31,22 +33,73 @@ public final class PingClanName {
         }
         String group = null;
         try {
-            group = Players.group(nick);
-            if (group == null || group.trim().isEmpty()) {
-                String prefix = Players.prefix(nick);
-                if (prefix != null) group = extractBracketTag(prefix);
-            }
-            if ((group == null || group.trim().isEmpty()) && shown != null) {
-                group = extractBracketTag(shown);
-            }
-            if (group == null || group.trim().isEmpty()) {
-                String tab = Players.tabName(nick);
-                if (tab != null) group = extractBracketTag(tab);
-            }
+            group = resolveGroup(entity, nick);
         } catch (RuntimeException ignored) {
             // Keep the nickname when the server's player list is unavailable.
         }
         return format(nick, shown, group);
+    }
+
+    public static String resolveGroup(Object entity, String nick) {
+        if ((nick == null || nick.isEmpty()) && entity != null) {
+            try { nick = Entities.name(entity); } catch (Throwable ignored) {}
+        }
+        if (nick == null || nick.isEmpty()) return null;
+        try {
+            String group = Players.group(nick);
+            if (group != null && !group.trim().isEmpty()) return cleanTag(group);
+            String prefix = Players.prefix(nick);
+            if (prefix != null) {
+                String tag = extractBracketTag(prefix);
+                if (tag != null && !tag.trim().isEmpty()) return cleanTag(tag);
+            }
+            if (entity != null) {
+                String shown = Entities.displayName(entity);
+                if (shown != null) {
+                    String tag = extractBracketTag(shown);
+                    if (tag != null && !tag.trim().isEmpty()) return cleanTag(tag);
+                }
+            }
+            String tab = Players.tabName(nick);
+            if (tab != null) {
+                String tag = extractBracketTag(tab);
+                if (tag != null && !tag.trim().isEmpty()) return cleanTag(tag);
+            }
+        } catch (Throwable ignored) {}
+        return null;
+    }
+
+    public static boolean isSameClan(Object entity, String nick) {
+        if (entity != null) {
+            try {
+                Relation rel = Relations.of(entity);
+                if (rel == Relation.GROUP || rel == Relation.SELF) return true;
+            } catch (Throwable ignored) {}
+        }
+        if (nick != null) {
+            try {
+                Relation rel = Relations.of(nick);
+                if (rel == Relation.GROUP || rel == Relation.SELF) return true;
+            } catch (Throwable ignored) {}
+        }
+        try {
+            String selfNick = Players.self();
+            if (selfNick == null || selfNick.isEmpty()) return false;
+            if (nick != null && selfNick.equalsIgnoreCase(nick)) return true;
+            String selfGroup = resolveGroup(null, selfNick);
+            if (selfGroup == null || selfGroup.isEmpty()) return false;
+            String targetGroup = resolveGroup(entity, nick);
+            if (targetGroup == null || targetGroup.isEmpty()) return false;
+            return selfGroup.equalsIgnoreCase(targetGroup);
+        } catch (Throwable ignored) {
+            return false;
+        }
+    }
+
+    private static String cleanTag(String tag) {
+        if (tag == null) return null;
+        String cleaned = tag.replace("[", "").replace("]", "").replace("(", "").replace(")", "").trim();
+        return cleaned.isEmpty() ? null : cleaned;
     }
 
     public static String format(String nick, String shown, String group) {

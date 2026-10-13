@@ -5,6 +5,7 @@ import dev.xavier.stein.loader.api.Entities;
 import dev.xavier.stein.loader.api.HudElement;
 import dev.xavier.stein.loader.api.HudPlacement;
 import dev.xavier.stein.loader.api.Option;
+import dev.xavier.stein.loader.api.Relation;
 import dev.xavier.stein.loader.api.Relations;
 import dev.xavier.stein.loader.api.Render;
 import dev.xavier.stein.loader.api.Stacks;
@@ -66,7 +67,7 @@ public final class TargetHealthElement implements HudElement {
 
    public void updateTarget() {
       Object candidate = TargetGrace.choose(findTarget(), target);
-      if (!(candidate instanceof EntityLivingBase)) {
+      if (!(candidate instanceof EntityLivingBase) || isIgnoredTarget(candidate)) {
          if (target != null) DebugLog.state("DamageIndicator", "target", "none");
          target = null;
          heldItem = null;
@@ -202,8 +203,17 @@ public final class TargetHealthElement implements HudElement {
       return null;
    }
 
-   private static boolean isIgnoredTarget(Object entity) {
+   public static boolean isIgnoredTarget(Object entity) {
+      if (entity == null) return true;
       if (TargetHealthMod.settings.ignoreArmorStands && entity instanceof EntityArmorStand) return true;
+      try {
+         Relation rel = Relations.of(entity);
+         if (rel == Relation.GROUP || rel == Relation.SELF) return true;
+      } catch (Throwable ignored) {}
+      try {
+         String nick = Entities.name(entity);
+         if (com.yny.utils.modules.clanping.PingClanName.isSameClan(entity, nick)) return true;
+      } catch (Throwable ignored) {}
       return TargetHealthMod.settings.ignoreAllies && Relations.of(entity).friendly();
    }
 
@@ -212,6 +222,9 @@ public final class TargetHealthElement implements HudElement {
 
    public boolean layout(boolean preview, float partialTicks) {
       if (!TargetHealthMod.settings.enabled) return false;
+      if (target != null && isIgnoredTarget(target)) {
+         target = null;
+      }
       if (target == null && !preview) return false;
       if (target == null) {
          name = "Jogador [Clã]";

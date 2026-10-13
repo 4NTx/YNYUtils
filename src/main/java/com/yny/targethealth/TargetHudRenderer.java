@@ -65,6 +65,9 @@ public final class TargetHudRenderer {
             Object[] armor,
             Object heldItem
     ) {
+        if (target != null && TargetHealthElement.isIgnoredTarget(target)) {
+            return;
+        }
         int width = WIDTH;
         int height = getHeight(target, armor, heldItem);
         int x = alignRight ? -width : 0;

@@ -22,7 +22,7 @@ public final class GfxWorldMarkers {
             Object self = Entities.self();
             if (self != null) {
                 for (Object player : Entities.players()) {
-                    if (player != self && Entities.isAlive(player) && Relations.of(player) == Relation.GROUP) {
+                    if (player != self && Entities.isAlive(player) && (Relations.of(player) == Relation.GROUP || PingClanName.isSameClan(player, Entities.name(player)))) {
                         ring.invoke(null, Entities.x(player, partialTicks), Entities.y(player, partialTicks) + 0.025,
                                 Entities.z(player, partialTicks), 0.43D, 0.025D, 0xDC46DC96);
                     }
@@ -42,6 +42,7 @@ public final class GfxWorldMarkers {
                 }
                 String name = PingClanName.display(target, active.targetName);
                 if (target != null && Entities.isAlive(target)) {
+                    active.updatePosition(Entities.x(target, partialTicks), Entities.y(target, partialTicks), Entities.z(target, partialTicks));
                     outline.invoke(null, target, 0.025D, 0xFFFF4545);
                     label.invoke(null, "§c◆ ATACAR ESTE INIMIGO §7• " + name,
                             Entities.x(target, partialTicks), Entities.y(target, partialTicks) + 2.3D,

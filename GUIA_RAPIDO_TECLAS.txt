@@ -1,0 +1,143 @@
+================================================================================
+          GUIA RÁPIDO DE TECLAS E CONFIGURAÇÕES - MODPACK YNY
+                (FÁCIL, DIRETO AO PONTO E COMPLETO)
+================================================================================
+
+Aqui tá o resumo de todas as teclas que você precisa apertar no jogo e o que
+cada uma faz. Tudo já vem configurado e pronto pra usar.
+
+================================================================================
+                          TECLAS PRINCIPAIS (COMBATE & PVP)
+================================================================================
+
+[ R ] -> AUTO REFILL (Reabastecimento Automático)
+--------------------------------------------------------------------------------
+• O que faz: Repõe seus itens na hotbar e inventário sozinho, sem você ter que
+  ficar organizando nada manualmente.
+• Modo atual: "Manter Estoque" -> Você só precisa ligar 1 vez e ter itens dentro
+  do seu baú. Sempre que gastar capira, poção ou espada da hotbar, ele repõe na hora.
+• Armaduras: Sempre mantém EXATAMENTE 3 SETS COMPLETOS no seu inventário.
+• Devolução: Se tiver peças usadas/gastas no inventário, ele DEVOLVE pro /bau vip.
+• TOTALMENTE EM SEGUNDO PLANO: Ele NÃO abre tela de baú na sua cara! Ou seja,
+  não interrompe seu PvP, não trava seu boneco e refila 100% liso.
+• Configuração opcional: Se você preferir refilar só quando der um clique em vez
+  de manter estoque automático contínuo, dá pra mudar apertando [INSERT].
+
+
+[ B ] -> /BAU VIP RÁPIDO
+--------------------------------------------------------------------------------
+• O que faz: Manda o comando '/bau vip' no chat instantaneamente.
+• Onde tá configurado: No Macro Keybind (já tá funcional e com proteção de delay).
+
+
+[ P ] -> AUTO ARMOR (Troca Automática de Armadura)
+--------------------------------------------------------------------------------
+• O que faz: Troca a peça da sua armadura na hora em que ela QUEBRA.
+• Nunca mais morra pelado: Se o elmo ou peitoral estourar no hit, ele puxa outro do
+  inventário instantaneamente.
+• Quer trocar antes de quebrar? Dá pra configurar! Aperte [INSERT] -> vá em
+  'YNYUtils' -> 'Auto Armor' e regule a durabilidade mínima que você quer.
+
+
+[ SETA PRA CIMA ] (UP Arrow no teclado) -> AUTO CONSUMÍVEIS (Capira e Poções)
+--------------------------------------------------------------------------------
+• O que faz: Liga e desliga o consumo automático inteligente de:
+  - Maçã Dourada / Capira (Notch)
+  - Poção de Força II
+  - Poção de Velocidade II
+• MODO ECONÔMICO (Não joga item fora):
+  - Perdeu vida? Ele come capira na hora.
+  - Tá com a vida cheia? NÃO come nada pra economizar.
+  - Tá rolando PvP? Ele renova a capira/poções assim que o efeito estiver acabando.
+  - NÃO tá em PvP? Se os efeitos acabarem e você tiver de boa, ele NÃO renova
+    à toa pra não torrar seus potes.
+
+
+[ M ] -> MOB AURA (Matar Mobs / Abrir Tesouro)
+--------------------------------------------------------------------------------
+• O que faz: Ataca automaticamente os monstros ao redor.
+• Potência: Bate em 2 ALVOS AO MESMO TEMPO com 12 CPS cravados.
+• ANTI-KNOCKBACK EM MOBS: Você NÃO leva knockback de Guardian nem de Wither (e
+  pode anular o tranco de vários outros monstros).
+• Seguro pra tesouro: Testado abrindo mais de 50 livros de tesouro sem ban nenhum
+  (use por sua conta em risco).
+• Prioridade em Boss: Se chegar perto de GUARDIAN ou WITHER, o Mob Aura foca e
+  tritura eles primeiro, ignorando zumbis e esqueletos comuns.
+• Pausa Automática em PvP: Se qualquer PLAYER INIMIGO colar perto de você, o Mob Aura
+  PAUSA na hora pra não dividir seus cliques nem bugar o seu PvP contra o player!
+  (Dá pra desativar essa pausa no Insert se quiser bater em tudo junto).
+
+
+[ N ] -> HITAR OU IGNORAR PIG ZOMBIE (Zombie Pigman)
+--------------------------------------------------------------------------------
+• O que faz: Alterna se o Mob Aura deve bater ou ignorar os Pig Zombies.
+• PADRÃO (DESLIGADO): Ele NÃO bate nos Pig Zombies de jeito nenhum!
+• Por que isso é bom? Pra abrir tesouro no Nether sem atrair a horda inteira de
+  Pigman pra cima de você. Você mata os Guardians, Withers e outros monstros
+  tranquilamente, gastando MUITO MENOS capira. Quando o local tiver limpo, aperta [N]
+  e mata os Pig Zombies se quiser.
+• SISTEMA INTELIGENTE (Anti-Morte): Se algum Pig Zombie já estiver irritado/agressivo
+  e vier te bater, ele vai bater de volta mesmo com a opção desligada pra você não morrer!
+• Atalhos no chat: Você também pode digitar /pig ou .pig pra ligar/desligar.
+
+
+[ V ] -> MODO FOCO (PvP Focus Mode)
+--------------------------------------------------------------------------------
+• O que faz: Faz seus ataques focarem automaticamente no inimigo mais frágil.
+• Prioridade: Foca quem estiver com MENOS VIDA ou SEM CAPACETE (ou que tiver com
+  alguma peça de armadura quebrada há mais de 1 segundo).
+• Comandos de chat úteis:
+  - /focus on | off    -> Liga ou desliga.
+  - /focus elmo        -> Foca apenas quem tiver sem capacete.
+  - /focus tempo 1     -> Ajusta o tempo de tolerância sem peça.
+
+
+[ G ] -> TOGGLE SPRINT (Correr Automático)
+--------------------------------------------------------------------------------
+• O que faz: Corre direto sem você precisar ficar dando dois toques rápidos no 'W'
+  ou segurando a tecla Control. Apertou 'W', o boneco já sai no sprint máximo.
+
+
+================================================================================
+                       MENUS E AJUSTES DE TELA
+================================================================================
+
+[ INSERT ] -> MENU GERAL DE CONFIGURAÇÕES
+--------------------------------------------------------------------------------
+• Aperte a tecla INSERT no seu teclado pra abrir o painel principal.
+• Lá dentro você pode mexer em absolutamente tudo:
+  - YNYUtils: Auto Armor, Auto Consumíveis, Ping do Clã, Mob Aura, Modo Foco.
+  - SteinCombat: Autoclicker, ToggleSprint, AutoRefill.
+  - Knockback: O limite mínimo travado é 90% (máximo de 10% de redução, 100% seguro).
+
+
+[ SHIFT DIREITO ] (Aquele Shift grandão embaixo do ENTER) -> EDITOR DE HUD
+--------------------------------------------------------------------------------
+• Abre a tela pra você clicar e arrastar os elementos visuais:
+  - Vida do adversário mirado.
+  - Status das armaduras e alertas de peças quebradas.
+  - Contador de CPS.
+  - Pings e bússola do Clã.
+  - Coloque cada coisa no cantinho da tela que você achar melhor!
+
+
+================================================================================
+                    DICA DE OURO: AUTOCLICKER ANTI-BAN
+================================================================================
+
+No menu do Autoclicker (abra no INSERT ou aperte F):
+• Recomendação de ouro: Use "BAIANO SINGLE CLICK 32/33".
+• Por que usar essa config?
+  - Não gera aviso de hack no servidor.
+  - Não toma flag de CPS alto pelo Anti-Cheat.
+  - Envia os hits com consistência perfeita sem bugar o clique nem travar os menus.
+
+================================================================================
+                         OUTRAS TECLAS ÚTEIS
+================================================================================
+• [ F ]            -> Liga / Desliga o Autoclicker.
+• [ C ]            -> Zoom suave (aproxima a câmera estilo luneta).
+• [ ' ou ~ ] (Til) -> Abre o menu do Macro Keybind pra criar novos macros.
+• [ SCROLL MOUSE ] -> Botão do meio da mira dá Ping de Clã (marca inimigo ou local).
+• [ H ]            -> Esconder / Modo Fantasma de membros do seu Clã em PvP em massa.
+================================================================================

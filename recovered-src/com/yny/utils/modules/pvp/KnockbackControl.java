@@ -150,7 +150,7 @@ public final class KnockbackControl {
       DebugLog.write("Knockback", "S12 local recebido; bruto=(" + var2 + "," + var3 + "," + var4 + ")");
       this.localVelocityListener.accept(var2, var4);
       boolean var5 = this.enabled.getAsBoolean();
-      int var6 = var5 ? Math.max(8, Math.min(100, this.percent.getAsInt())) : 100;
+      int var6 = var5 ? Math.max(90, Math.min(100, this.percent.getAsInt())) : 100;
       boolean var7 = this.preserveVertical.getAsBoolean();
       if (var5 && var6 != 100) {
          var1.b = scale(var1.b, var6);

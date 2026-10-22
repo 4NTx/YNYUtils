@@ -39,18 +39,18 @@ public final class VerifyAllTaskFixesTest {
         cfgField.setAccessible(true);
         YNYConfig cfg = (YNYConfig) cfgField.get(null);
 
-        // Test 8%, 50%, 80%, 100% dynamic values
+        // Test 90%, 95%, 100% dynamic values
         cfg.knockbackEnabled = true;
-        cfg.knockbackPercent = 8;
+        cfg.knockbackPercent = 90;
         cfg.knockbackPreserveVertical = true;
         check((boolean) invoke(mod, "lambda$new$2"), "lambda$new$2 must reflect knockbackEnabled=true");
-        check((int) invoke(mod, "lambda$new$3") == 8, "lambda$new$3 must reflect knockbackPercent=8");
+        check((int) invoke(mod, "lambda$new$3") == 90, "lambda$new$3 must reflect knockbackPercent=90");
         check((boolean) invoke(mod, "lambda$new$4"), "lambda$new$4 must reflect knockbackPreserveVertical=true");
 
-        // Verify sanitize clamps anything below 8 to 8
+        // Verify sanitize clamps anything below 90 to 90
         cfg.knockbackPercent = 0;
         cfg.sanitize();
-        check(cfg.knockbackPercent == 8, "YNYConfig.sanitize() must clamp knockbackPercent < 8 to 8");
+        check(cfg.knockbackPercent == 90, "YNYConfig.sanitize() must clamp knockbackPercent < 90 to 90");
 
         cfg.knockbackPercent = 50;
         check((int) invoke(mod, "lambda$new$3") == 50, "lambda$new$3 must reflect knockbackPercent=50");
@@ -74,7 +74,7 @@ public final class VerifyAllTaskFixesTest {
 
         hud.getMethod("showKnockback", boolean.class).invoke(hudInstance, false);
         check("Knockback: DESATIVADO".equals(msgField.get(hudInstance)), "HUD message on disabled must be 'Knockback: DESATIVADO'");
-        System.out.println("  PASS: Knockback dynamic getters (8-100% floor) and HUD display verified.");
+        System.out.println("  PASS: Knockback dynamic getters (90-100% floor) and HUD display verified.");
     }
 
     private static void verifyToggleSprint() throws Exception {

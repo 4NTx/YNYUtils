@@ -1073,7 +1073,7 @@ public final class ApplyAllPackUpdates {
                     boolean isMinCandidate = false;
                     if (insn.getOpcode() == Opcodes.BIPUSH) {
                         int op = ((IntInsnNode) insn).operand;
-                        if (op == 92 || op == 93 || op == 0 || op == 8) {
+                        if (op == 92 || op == 93 || op == 0 || op == 8 || op == 90) {
                             isMinCandidate = true;
                         }
                     } else if (insn.getOpcode() == Opcodes.ICONST_0) {
@@ -1082,8 +1082,8 @@ public final class ApplyAllPackUpdates {
                     if (isMinCandidate) {
                         AbstractInsnNode next = insn.getNext();
                         if (next != null && next.getOpcode() == Opcodes.BIPUSH && ((IntInsnNode) next).operand == 100) {
-                            mn.instructions.set(insn, new IntInsnNode(Opcodes.BIPUSH, 8));
-                            System.out.println("  Patched KnockbackControl.adjust: changed min clamp to 8");
+                            mn.instructions.set(insn, new IntInsnNode(Opcodes.BIPUSH, 90));
+                            System.out.println("  Patched KnockbackControl.adjust: changed min clamp to 90");
                         }
                     }
                 }

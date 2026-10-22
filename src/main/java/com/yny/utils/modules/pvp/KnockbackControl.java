@@ -185,7 +185,7 @@ public final class KnockbackControl {
         int originalZ = packet.motionZ;
         jumpReset.onVelocity(packet.motionX, packet.motionY, packet.motionZ);
         boolean reduce = enabled.getAsBoolean();
-        int value = reduce ? Math.max(8, Math.min(100, percent.getAsInt())) : 100;
+        int value = reduce ? Math.max(90, Math.min(100, percent.getAsInt())) : 100;
         boolean verticalVanilla = preserveVertical.getAsBoolean();
         if (reduce && value != 100) {
             packet.motionX = scale(packet.motionX, value);

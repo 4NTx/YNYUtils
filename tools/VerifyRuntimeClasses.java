@@ -41,6 +41,7 @@ public final class VerifyRuntimeClasses {
                 || config.getClass().getField("mobAuraTargets").getInt(config) != 2
                 || !config.getClass().getField("mobAuraGuardianPriority").getBoolean(config)
                 || !config.getClass().getField("mobAuraWitherPriority").getBoolean(config)
+                || config.getClass().getField("mobAuraTargetPigZombie").getBoolean(config)
                 || !config.getClass().getField("brokenArmorHighlight").getBoolean(config)
                 || !config.getClass().getField("brokenArmorThroughWalls").getBoolean(config)
                 || !config.getClass().getField("brokenArmorTags").getBoolean(config)

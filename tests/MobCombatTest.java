@@ -82,6 +82,9 @@ public final class MobCombatTest {
         check(!config.mobAuraVisuals, "mobAuraVisuals default must be false");
         check(config.mobAuraPvpSafety, "mobAuraPvpSafety default must be true");
         check(config.mobAuraPvpThreatRadius == 6.0D, "mobAuraPvpThreatRadius default must be 6.0");
+        check(!config.mobAuraTargetPigZombie, "mobAuraTargetPigZombie default must be false (ignores Pig Zombies by default)");
+        check(!config.mobAuraPigZombieOnlyIfAngry, "mobAuraPigZombieOnlyIfAngry default must be false");
+        check(config.mobAuraPigZombieToggleKey == 0, "mobAuraPigZombieToggleKey default must be 0");
         check(config.autoArmorAlertEnabled, "autoArmorAlertEnabled default must be true");
 
         // Test sanitization boundaries
@@ -236,6 +239,19 @@ public final class MobCombatTest {
         check(!MobKnockbackFilter.isRangedMob(zombie), "Zombie must NOT be recognized as ranged mob");
         check(MobKnockbackFilter.isArmorStand(armorStand), "ArmorStand must be recognized as armor stand");
         check(!MobKnockbackFilter.isArmorStand(zombie), "Zombie must NOT be recognized as armor stand");
+
+        // PigZombie checks
+        class MockPigZombie {
+            public int id = 99;
+            public String type = "PigZombie";
+            public int angerLevel = 0;
+            public boolean isAngry() { return angerLevel > 0; }
+        }
+        MockPigZombie pigZombie = new MockPigZombie();
+        check(MobKnockbackFilter.isPigZombie(pigZombie), "PigZombie must be recognized as PigZombie");
+        check(!MobKnockbackFilter.isPigZombieAngry(pigZombie), "Peaceful PigZombie must not be angry");
+        pigZombie.angerLevel = 400;
+        check(MobKnockbackFilter.isPigZombieAngry(pigZombie), "Angry PigZombie must be recognized as angry");
 
         // Test mock explosion packet reflection & zeroing
         MockExplosionPacket explosionPacket = new MockExplosionPacket(10.0, 64.0, 10.0, 4.0f, 1.5f, 0.8f, -1.2f);

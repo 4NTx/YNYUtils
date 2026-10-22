@@ -75,6 +75,9 @@ public final class YNYConfig {
    public volatile boolean mobAuraStatusHudEnabled = true;
    public volatile boolean mobAuraAttackPassives = false;
    public volatile boolean mobAuraVisuals = false;
+   public volatile boolean mobAuraTargetPigZombie = false;
+   public volatile boolean mobAuraPigZombieOnlyIfAngry = false;
+   public volatile int mobAuraPigZombieToggleKey = 0;
 
    // Destaque de Armadura Quebrada (Elmo, Bota, etc.)
    public volatile boolean brokenArmorHighlight = true;
@@ -108,7 +111,7 @@ public final class YNYConfig {
       this.inventoryMoveSuspendUse = true;
       this.autoProtectLowHealth = Math.max(1, Math.min(16, this.autoProtectLowHealth));
       this.autoProtectResumeHealth = Math.max(this.autoProtectLowHealth + 1, Math.min(20, this.autoProtectResumeHealth));
-      this.knockbackPercent = Math.max(8, Math.min(100, this.knockbackPercent));
+      this.knockbackPercent = Math.max(90, Math.min(100, this.knockbackPercent));
       this.autoArmorPreventiveThreshold = com.yny.utils.modules.player.ArmorThreshold.normalize(this.autoArmorPreventiveThreshold);
       this.autoArmorPreferredMaterial = Math.max(0, Math.min(5, this.autoArmorPreferredMaterial));
       this.goldenAppleMode = Math.max(0, Math.min(2, this.goldenAppleMode));

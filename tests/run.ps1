@@ -19,7 +19,7 @@ try {
     $toolsDir = (Resolve-Path 'tools').Path
 
     New-Item -ItemType Directory -Path 'build\tests' -Force | Out-Null
-    & "$Jdk\bin\javac.exe" -encoding UTF-8 -classpath "$compileClassPath;$teamJar;$combatJar" -d build\tests tests\AutoArmorSafetyTest.java tests\KnockbackControlTest.java tests\ConsumablePolicyTest.java tests\AutoProtectTest.java tests\BowAimAssistTest.java tests\BrokenArmorHighlightTest.java tests\AdvancedClanDetectionTest.java tests\FocusModeAndSelfArmorHudTest.java tests\AllyAttackFlowTest.java tests\VerifyAllTaskFixesTest.java
+    & "$Jdk\bin\javac.exe" -encoding UTF-8 -classpath "$compileClassPath;$teamJar;$combatJar" -d build\tests tests\AutoArmorSafetyTest.java tests\KnockbackControlTest.java tests\ConsumablePolicyTest.java tests\AutoProtectTest.java tests\BowAimAssistTest.java tests\BrokenArmorHighlightTest.java tests\AdvancedClanDetectionTest.java tests\FocusModeAndSelfArmorHudTest.java tests\AllyAttackFlowTest.java tests\MobCombatTest.java tests\VerifyAllTaskFixesTest.java
     if ($LASTEXITCODE -ne 0) { throw 'Falha compilando testes' }
     $testsPath = (Resolve-Path 'build\tests').Path
     Push-Location $testsPath
@@ -42,6 +42,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Regressão FocusMode e SelfArmorHud detectada' }
         & "$Jdk\bin\java.exe" -classpath "$testsPath;$compileClassPath" com.yny.utils.modules.pvp.AllyAttackFlowTest
         if ($LASTEXITCODE -ne 0) { throw 'Regressão Ally Attack Flow detectada' }
+        & "$Jdk\bin\java.exe" -classpath "$testsPath;$compileClassPath" com.yny.utils.modules.pvp.MobCombatTest
+        if ($LASTEXITCODE -ne 0) { throw 'Regressão Mob Combat detectada' }
         & "$Jdk\bin\java.exe" -classpath "$testsPath;$packJar;$combatJar;$teamJar;$toolsDir;$compileClassPath" com.yny.utils.modules.pvp.VerifyAllTaskFixesTest
         if ($LASTEXITCODE -ne 0) { throw 'Regressão VerifyAllTaskFixes detectada' }
     } finally {

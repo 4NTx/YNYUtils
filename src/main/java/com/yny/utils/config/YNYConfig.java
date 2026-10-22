@@ -78,6 +78,9 @@ public final class YNYConfig {
    public volatile boolean mobAuraVisuals = false;
    public volatile boolean mobAuraPvpSafety = true;
    public volatile double mobAuraPvpThreatRadius = 6.0D;
+   public volatile boolean mobAuraTargetPigZombie = false; // Por padrão: IGNORA Pig Zombie para não atrair a horda
+   public volatile boolean mobAuraPigZombieOnlyIfAngry = false; // Se ativado, ataca apenas os que já estiverem agressivos
+   public volatile int mobAuraPigZombieToggleKey = 0;
 
    // Destaque de Armadura Quebrada (Elmo, Bota, etc.)
    public volatile boolean brokenArmorHighlight = true;
@@ -122,7 +125,7 @@ public final class YNYConfig {
       this.inventoryMoveSuspendUse = true;
       this.autoProtectLowHealth = Math.max(1, Math.min(16, this.autoProtectLowHealth));
       this.autoProtectResumeHealth = Math.max(this.autoProtectLowHealth + 1, Math.min(20, this.autoProtectResumeHealth));
-      this.knockbackPercent = Math.max(8, Math.min(100, this.knockbackPercent));
+      this.knockbackPercent = Math.max(90, Math.min(100, this.knockbackPercent));
       this.autoArmorPreventiveThreshold = com.yny.utils.modules.player.ArmorThreshold.normalize(this.autoArmorPreventiveThreshold);
       this.autoArmorPreferredMaterial = Math.max(0, Math.min(5, this.autoArmorPreferredMaterial));
       this.goldenAppleMode = Math.max(0, Math.min(2, this.goldenAppleMode));

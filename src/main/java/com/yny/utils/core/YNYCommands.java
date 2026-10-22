@@ -53,6 +53,14 @@ public final class YNYCommands {
             return true;
         }
 
+        // 3. Comando: /pig ou .pig ou /pigzombie ou .pigzombie
+        if (cmd.equals("/pig") || cmd.equals(".pig")
+                || cmd.equals("/pigzombie") || cmd.equals(".pigzombie")
+                || cmd.equals("/mobpig") || cmd.equals(".mobpig")) {
+            com.yny.utils.modules.pvp.MobAura.togglePigZombieTarget();
+            return true;
+        }
+
         return false;
     }
 

@@ -13,6 +13,7 @@ import com.yny.utils.core.DebugLog;
 import com.yny.utils.core.SafeEntities;
 import com.yny.utils.core.ToggleKey;
 import com.yny.utils.modules.clanping.PingClanName;
+import com.yny.utils.modules.player.AutoArmorHelper;
 import com.yny.utils.modules.player.AutoProtect;
 import com.yny.utils.modules.player.PriorityBus;
 
@@ -39,6 +40,7 @@ public final class MobAura {
     private static long lastAttackNanos = 0L;
     private static final List<Object> currentTargets = new ArrayList<>(2);
     private static final ToggleKey toggleKey = new ToggleKey();
+    private static final ToggleKey pigZombieKey = new ToggleKey();
 
     // -------------------------------------------------------------------------
     // Pool de candidatos e coleções estáticas reutilizáveis (Zero-Allocation de GC)
@@ -140,6 +142,16 @@ public final class MobAura {
             if (Entities.isPlayer(entity)) continue; // NUNCA atacar players com MobAura
             if (!Entities.isAlive(entity) || Entities.health(entity) <= 0.0F) continue;
             if (MobKnockbackFilter.isArmorStand(entity)) continue;
+
+            // Filtro Pig Zombie: ignora por padrão até o jogador ativar o botão/atalho
+            if (MobKnockbackFilter.isPigZombie(entity)) {
+                if (!config.mobAuraTargetPigZombie) {
+                    continue;
+                }
+                if (config.mobAuraPigZombieOnlyIfAngry && !MobKnockbackFilter.isPigZombieAngry(entity)) {
+                    continue;
+                }
+            }
 
             boolean isWith = MobKnockbackFilter.isWither(entity);
             boolean isGuard = MobKnockbackFilter.isGuardian(entity);
@@ -356,9 +368,9 @@ public final class MobAura {
 
     public static void updateToggleKey() {
         YNYConfig config = YNYUtils.getConfig();
-        if (config == null || config.mobAuraToggleKey == 0) return;
+        if (config == null) return;
 
-        if (toggleKey.wasPressed(config.mobAuraToggleKey)) {
+        if (config.mobAuraToggleKey != 0 && toggleKey.wasPressed(config.mobAuraToggleKey)) {
             config.mobAuraEnabled = !config.mobAuraEnabled;
             if (config.mobAuraStatusHudEnabled) {
                 Chat.actionBar(config.mobAuraEnabled
@@ -372,6 +384,26 @@ public final class MobAura {
                 store.saveSoon();
             }
         }
+
+        if (config.mobAuraPigZombieToggleKey != 0 && pigZombieKey.wasPressed(config.mobAuraPigZombieToggleKey)) {
+            togglePigZombieTarget();
+        }
+    }
+
+    public static boolean togglePigZombieTarget() {
+        YNYConfig config = YNYUtils.getConfig();
+        if (config == null) return false;
+        config.mobAuraTargetPigZombie = !config.mobAuraTargetPigZombie;
+        try {
+            AutoArmorHelper.playToggleSound(config.mobAuraTargetPigZombie);
+            Chat.actionBar(config.mobAuraTargetPigZombie ? "§a§lMobAura: Hitar Pig Zombie ATIVADO" : "§c§lMobAura: Ignorar Pig Zombie ATIVADO");
+            Chat.print("§8[§c§lYNY§8] §7MobAura - Hitar Pig Zombie: " + (config.mobAuraTargetPigZombie ? "§a§lATIVADO" : "§c§lDESATIVADO (Ignorando)"));
+        } catch (Throwable ignored) {}
+        ModConfig<YNYConfig> store = YNYUtils.getConfigStore();
+        if (store != null) {
+            store.saveSoon();
+        }
+        return config.mobAuraTargetPigZombie;
     }
 
     public static void reset() {
@@ -432,6 +464,18 @@ public final class MobAura {
                     config.mobAuraCps = (int) value;
                     markConfigChanged();
                 }, value -> (int) value + " CPS"))
+                .option(Option.toggle("Hitar Pig Zombie (Zombie Pigman)", () -> config.mobAuraTargetPigZombie, value -> {
+                    config.mobAuraTargetPigZombie = value;
+                    markConfigChanged();
+                }))
+                .option(Option.key("Tecla para alternar hitar Pig Zombie", () -> config.mobAuraPigZombieToggleKey, value -> {
+                    config.mobAuraPigZombieToggleKey = value;
+                    markConfigChanged();
+                }))
+                .option(Option.toggle("Hitar Pig Zombie apenas se estiver irritado/agressivo", () -> config.mobAuraPigZombieOnlyIfAngry, value -> {
+                    config.mobAuraPigZombieOnlyIfAngry = value;
+                    markConfigChanged();
+                }))
                 .option(Option.toggle("Atacar mobs passivos", () -> config.mobAuraAttackPassives, value -> {
                     config.mobAuraAttackPassives = value;
                     markConfigChanged();

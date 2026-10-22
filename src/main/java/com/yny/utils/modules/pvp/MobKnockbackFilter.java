@@ -563,6 +563,65 @@ public final class MobKnockbackFilter {
         return t.contains("skeleton") || t.contains("blaze") || t.contains("ghast") || t.contains("witch");
     }
 
+    private static Method mIsAngry;
+    private static Field fAngerLevel;
+    private static boolean pigZombieReflectResolved;
+
+    public static boolean isPigZombie(Object e) {
+        if (e == null) return false;
+        String type = getTypeNameSafe(e);
+        if (type != null) {
+            String t = type.toLowerCase();
+            if (t.contains("pigzombie") || t.contains("pig_zombie") || t.contains("zombiepigman")
+                    || t.contains("zombie_pigman") || t.contains("pigman")) {
+                return true;
+            }
+        }
+        Class<?> c = e.getClass();
+        String name = c.getName();
+        return name.contains("PigZombie") || name.equals("vw") || name.endsWith(".vw");
+    }
+
+    public static boolean isPigZombieAngry(Object e) {
+        if (!isPigZombie(e)) return false;
+        if (!pigZombieReflectResolved) {
+            pigZombieReflectResolved = true;
+            Class<?> c = e.getClass();
+            while (c != null && c != Object.class) {
+                for (Method m : c.getDeclaredMethods()) {
+                    if (m.getParameterCount() == 0 && m.getReturnType() == boolean.class) {
+                        String n = m.getName();
+                        if ("func_175457_ck".equals(n) || "cm".equals(n) || "isAngry".equals(n)) {
+                            mIsAngry = m;
+                            m.setAccessible(true);
+                            break;
+                        }
+                    }
+                }
+                for (Field f : c.getDeclaredFields()) {
+                    if (f.getType() == int.class) {
+                        String n = f.getName();
+                        if ("field_70838_e".equals(n) || "bn".equals(n) || "angerLevel".equals(n)) {
+                            fAngerLevel = f;
+                            f.setAccessible(true);
+                            break;
+                        }
+                    }
+                }
+                c = c.getSuperclass();
+            }
+        }
+        try {
+            if (mIsAngry != null) {
+                return (boolean) mIsAngry.invoke(e);
+            }
+            if (fAngerLevel != null) {
+                return fAngerLevel.getInt(e) > 0;
+            }
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
     public static String getTypeNameSafe(Object e) {
         if (e == null) return null;
         try {

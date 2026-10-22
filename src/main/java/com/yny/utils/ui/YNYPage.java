@@ -74,8 +74,8 @@ public final class YNYPage {
                 }
                 markConfigChanged();
             }))
-            .option(Option.slider("Knockback recebido", 8.0, 100.0, 1.0, () -> config.knockbackPercent, value -> {
-                config.knockbackPercent = Math.max(8, (int) value);
+            .option(Option.slider("Knockback recebido", 90.0, 100.0, 1.0, () -> config.knockbackPercent, value -> {
+                config.knockbackPercent = Math.max(90, (int) value);
                 markConfigChanged();
             }, value -> (int) value + "% (redução: " + (100 - (int) value) + "%)"))
             .option(Option.toggle("Manter impulso vertical normal", () -> config.knockbackPreserveVertical, value -> {
@@ -358,6 +358,22 @@ public final class YNYPage {
             }))
             .option(Option.toggle("Não levar KB de outros Mobs", () -> config.mobKnockbackEnabled, value -> {
                 config.mobKnockbackEnabled = value;
+                markConfigChanged();
+            }))
+            .option(Option.toggle("Hitar Pig Zombie (Zombie Pigman)", () -> config.mobAuraTargetPigZombie, value -> {
+                config.mobAuraTargetPigZombie = value;
+                try {
+                    com.yny.utils.modules.player.AutoArmorHelper.playToggleSound(value);
+                    dev.xavier.stein.loader.api.Chat.actionBar(value ? "§a§lMobAura: Hitar Pig Zombie ATIVADO" : "§c§lMobAura: Ignorar Pig Zombie ATIVADO");
+                } catch (Throwable ignored) {}
+                markConfigChanged();
+            }))
+            .option(Option.key("Tecla para alternar hitar Pig Zombie", () -> config.mobAuraPigZombieToggleKey, value -> {
+                config.mobAuraPigZombieToggleKey = value;
+                markConfigChanged();
+            }))
+            .option(Option.toggle("Hitar Pig Zombie apenas se estiver irritado/agressivo", () -> config.mobAuraPigZombieOnlyIfAngry, value -> {
+                config.mobAuraPigZombieOnlyIfAngry = value;
                 markConfigChanged();
             }))
             .option(Option.toggle("Atacar mobs passivos", () -> config.mobAuraAttackPassives, value -> {

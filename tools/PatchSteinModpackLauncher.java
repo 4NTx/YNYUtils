@@ -286,6 +286,7 @@ public class PatchSteinModpackLauncher {
             "import java.nio.charset.StandardCharsets;\n" +
             "import java.nio.file.Files;\n" +
             "import java.util.*;\n" +
+            "import java.util.regex.*;\n" +
             "public class Loader {\n" +
             "    public static void main(String[] args) throws Exception {\n" +
             "        File baseDir;\n" +
@@ -341,6 +342,9 @@ public class PatchSteinModpackLauncher {
             "            String rel = \"data/.minecraft/versions/1.8.9-SteinLoader/runtime/bin/javaw.exe\";\n" +
             "            String steinVersion = \"1.8.9-SteinLoader\";\n" +
             "            String steinArgs = \"-Xmx8G -Xms256M -XX:SoftMaxHeapSize=768M -XX:+UseZGC -XX:-ZProactive --enable-native-access=ALL-UNNAMED -Dsteinbridge.gfx=false\";\n" +
+            "            if (content.contains(\"\\\"selectedProfile\\\"\")) {\n" +
+            "                content = content.replaceAll(\"\\\"selectedProfile\\\"\\\\s*:\\\\s*\\\".*?\\\"\", \"\\\"selectedProfile\\\": \\\"Stein Loader 1.8.9\\\"\");\n" +
+            "            }\n" +
             "            String steinBlock = \"    \\\"Stein Loader 1.8.9\\\": {\\n      \\\"name\\\": \\\"Stein Loader 1.8.9\\\",\\n      \\\"lastVersionId\\\": \\\"\" + steinVersion + \"\\\",\\n      \\\"javaDir\\\": \\\"\" + rel + \"\\\",\\n      \\\"javaArgs\\\": \\\"\" + steinArgs + \"\\\",\\n      \\\"useHopperCrashService\\\": false\\n    }\";\n" +
             "            if (!content.contains(\"\\\"Stein Loader 1.8.9\\\"\")) {\n" +
             "                int pIdx = content.indexOf(\"\\\"profiles\\\"\");\n" +
@@ -350,8 +354,44 @@ public class PatchSteinModpackLauncher {
             "                        content = content.substring(0, brace + 1) + \"\\n\" + steinBlock + \",\\n\" + content.substring(brace + 1);\n" +
             "                    }\n" +
             "                }\n" +
+            "            } else {\n" +
+            "                content = content.replaceAll(\"\\\"Stein Loader 1.8.9\\\"\\\\s*:\\\\s*\\\\{[^}]*\\\\}\", Matcher.quoteReplacement(steinBlock.trim()));\n" +
             "            }\n" +
-            "            content = content.replaceAll(\"\\\"javaDir\\\"\\\\s*:\\\\s*\\\".*?\\\"\", \"\\\"javaDir\\\": \\\"\" + rel + \"\\\"\");\n" +
+            "            Pattern p = Pattern.compile(\"(\\\"([^\\\"]+)\\\"\\\\s*:\\\\s*\\\\{)([^}]+)(\\\\})\");\n" +
+            "            Matcher m = p.matcher(content);\n" +
+            "            StringBuffer sb = new StringBuffer();\n" +
+            "            int authIdx = content.indexOf(\"\\\"authenticationDatabase\\\"\");\n" +
+            "            while (m.find()) {\n" +
+            "                if (authIdx > 0 && m.start() >= authIdx) {\n" +
+            "                    m.appendReplacement(sb, Matcher.quoteReplacement(m.group(0)));\n" +
+            "                    continue;\n" +
+            "                }\n" +
+            "                String profName = m.group(2);\n" +
+            "                if (profName.equals(\"Stein Loader 1.8.9\") || profName.equals(\"profiles\")) {\n" +
+            "                    m.appendReplacement(sb, Matcher.quoteReplacement(m.group(0)));\n" +
+            "                    continue;\n" +
+            "                }\n" +
+            "                String body = m.group(3);\n" +
+            "                if (!body.contains(\"\\\"lastVersionId\\\"\")) {\n" +
+            "                    body = body + \",\\n      \\\"lastVersionId\\\": \\\"\" + steinVersion + \"\\\"\";\n" +
+            "                } else {\n" +
+            "                    body = body.replaceAll(\"\\\"lastVersionId\\\"\\\\s*:\\\\s*\\\".*?\\\"\", \"\\\"lastVersionId\\\": \\\"\" + steinVersion + \"\\\"\");\n" +
+            "                }\n" +
+            "                if (!body.contains(\"\\\"javaDir\\\"\")) {\n" +
+            "                    body = body + \",\\n      \\\"javaDir\\\": \\\"\" + rel + \"\\\"\";\n" +
+            "                } else {\n" +
+            "                    body = body.replaceAll(\"\\\"javaDir\\\"\\\\s*:\\\\s*\\\".*?\\\"\", \"\\\"javaDir\\\": \\\"\" + rel + \"\\\"\");\n" +
+            "                }\n" +
+            "                if (!body.contains(\"\\\"javaArgs\\\"\")) {\n" +
+            "                    body = body + \",\\n      \\\"javaArgs\\\": \\\"\" + steinArgs + \"\\\"\";\n" +
+            "                } else {\n" +
+            "                    body = body.replaceAll(\"\\\"javaArgs\\\"\\\\s*:\\\\s*\\\".*?\\\"\", \"\\\"javaArgs\\\": \\\"\" + steinArgs + \"\\\"\");\n" +
+            "                }\n" +
+            "                String replacement = m.group(1) + body + m.group(4);\n" +
+            "                m.appendReplacement(sb, Matcher.quoteReplacement(replacement));\n" +
+            "            }\n" +
+            "            m.appendTail(sb);\n" +
+            "            content = sb.toString();\n" +
             "            Files.write(profilesFile.toPath(), content.getBytes(StandardCharsets.UTF_8));\n" +
             "        } catch (Throwable t) { t.printStackTrace(); }\n" +
             "    }\n" +

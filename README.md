@@ -29,7 +29,7 @@ Os nomes das propriedades JSON foram preservados para manter as configurações 
 
 O Knockback Control do pacote ativo aplica 92% do impulso recebido ao jogador local. O painel deixa os resets juntos: Shift Reset e Jump Reset são mutuamente exclusivos; ligar um desliga o outro. O Jump Reset só tenta pular após impulso recebido enquanto o jogador ainda está no chão e respeita a janela de estado definida pelo módulo.
 
-Os logs detalhados ficam ligados por padrão. A gravação é assíncrona e separada por módulo em `logs/ynyutils/`; arquivos com mais de 24 horas são removidos e o total é limitado a 32 MiB. O gravador descarta eventos se a fila limitada encher e registra um resumo de descartes.
+Os logs detalhados ficam ligados por padrão. A gravação é assíncrona e separada por módulo em `logs/ynyutils/`; os registros locais de diagnóstico são removidos após 30 minutos e o total é limitado a 32 MiB. O gravador aguarda espaço se a fila limitada encher; a fila remota aguarda confirmação de entrega.
 
 O interceptor é instalado uma vez por conexão, ao entrar no mundo. Mudanças
 seguidas de configuração ou keybind são agrupadas pelo SDK.
@@ -140,3 +140,16 @@ O indicador atualiza vida pelo evento `onHealthChanged` e também a relê a cada
 Quando `50% no primeiro aliado; grupo/clã sempre ignorado` está ativo, o mesmo clã (`GROUP`) é sempre ignorado. Se o jogador clicar diretamente em um aliado de outra relação (`ALLY`), o cliente faz uma rolagem de 50% nesse clique: se passar, preserva o ataque original; caso contrário, busca o primeiro inimigo no raio antes de uma parede. Um inimigo clicado diretamente mantém o ataque normal. A chance decide qual ataque o cliente tenta; o dano ainda depende do servidor. Com a opção desligada, o ataque vanilla é mantido.
 
 A rolagem usa `ThreadLocalRandom.nextBoolean()` uma vez no primeiro ALLY, sem espera nem ação de rede. O evento e o resultado são registrados de forma assíncrona no log de combate.
+
+## Comandos enviados e identificação do clã (15/10/2026)
+
+O callback `onSendChat` registra comandos iniciados com `/` como `Command`, antes dos módulos processarem a mensagem. Assim, `/tell oi` aparece em `logs/ynyutils/system-AAAAMMDD.log` e entra na fila remota mesmo quando o Minecraft não escreve esse envio em `latest.log`. O texto é preservado integralmente. Comandos emitidos por outros mods diretamente como pacotes de rede podem não passar por esse callback.
+
+A identificação do clã é consultada novamente a cada dois segundos após entrar no servidor. A leitura prioriza o campo de clã da scoreboard, depois as informações de grupo, team e tab da SDK. Quando a tag aparece ou muda, o cliente envia `CLAN_UPDATE` para atualizar `last_clan` na instalação remota. O resultado no jogo depende dos dados que o servidor publica para a scoreboard ou lista de jogadores.
+## Envio remoto de comandos (15/10/2026)
+
+Para o teste atual, somente comandos digitados com `/` no chat entram no envio remoto. `onSendChat` registra o texto integral como categoria `Command`, e o uploader o guarda em `logs/ynyutils/remote-pending/` antes de enviá-lo em lotes autenticados. Comandos pendentes de sessões anteriores são priorizados; diagnósticos e erros antigos que ainda aguardavam envio são retirados da fila. A identificação da instalação, nick e servidor acompanha cada comando. A telemetria de identificação do jogador continua ativa.
+
+Os diagnósticos dos módulos continuam nos arquivos locais `logs/ynyutils/`, com limpeza após 30 minutos. O cliente não espelha `latest.log` nem outros logs gerais enquanto este teste estiver ativo. Os comandos já recebidos pelo servidor permanecem guardados sem expiração; registros remotos anteriores de outras categorias não são apagados por esta mudança.
+
+O filtro `Descartar armaduras recebidas` só pode descartar quando Auto Armor e essa opção estiverem ligados. Ao desligar Auto Armor, a fila interna de descarte é limpa e o inventário atual vira a nova referência.

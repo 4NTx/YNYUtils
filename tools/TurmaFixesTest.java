@@ -43,6 +43,18 @@ public final class TurmaFixesTest {
             throw new AssertionError("Protection 4 helmet must NOT be discarded");
         }
 
-        System.out.println("PASS: TurmaFixesTest - all slot comparison, restore slot, and discard policy checks passed!");
+        // 4. AutoArmorHelper new methods:
+        if (AutoArmorHelper.shouldPauseForUsingItem(null)) {
+            throw new AssertionError("AutoArmor must never pause for usingItem / sword blocking!");
+        }
+        int pivot = AutoArmorHelper.findHotbarPivot();
+        if (pivot < 0 || pivot > 8) {
+            throw new AssertionError("Hotbar pivot must be between 0 and 8, got " + pivot);
+        }
+        if (AutoArmorHelper.recoverOrphanedCursor()) {
+            throw new AssertionError("recoverOrphanedCursor must return false when cursor is null");
+        }
+
+        System.out.println("PASS: TurmaFixesTest - all slot comparison, restore slot, discard policy, and zero-cursor helper checks passed!");
     }
 }

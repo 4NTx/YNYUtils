@@ -188,5 +188,13 @@ Após análise exaustiva dos 4 arquivos de log da pasta `Logs da turma` (`ynyuti
    - Bytecode compilado em Java 8 (`--release 8`). Verificado via `VerifyPackageLinks` (56 classes, 3579 links internos), `VerifyRuntimeClasses` com `-Xverify:all`, testes unitários de segurança e `CheckPackConflicts.ps1`.
    - Hash SHA-256 do pacote ativo: `ECA0AD76356DAC9E75FC510F18DDABAD102FADCFFEC5A1E9602CC315809695B0` sincronizado em `artifacts/`, `build/` e nas três instalações do jogo.
 
+## Auto Armor: recuperação de troca pendente sem callback de slot (16/10/2026)
+
+O pacote ativo já tinha a correção que evita bloquear permanentemente uma troca preventiva rejeitada. Havia outro caminho de espera indefinida: quando a armadura nova aparecia equipada localmente, mas o servidor não enviava os callbacks de slot, `serverConfirmed` continuava falso. Se a peça antiga permanecesse no cursor, o timeout apenas registrava a pausa e mantinha `pending` para sempre, impedindo novas trocas.
+
+`tools/AutoArmorPendingRecovery.java` altera o binário ativo: após 16 ticks, com a troca aplicada localmente e a peça nova ainda no slot de armadura, permite entrar no fluxo seguro de devolução da peça antiga. Sem confirmação autoritativa, não executa o descarte automático da peça antiga. Cursor de identidade desconhecida continua aguardando intervenção manual. O código legível em `src/main/java` recebeu a mesma regra; ele continua sendo uma base anterior que não reconstrói sozinho o pacote inteiro.
+
+O `.steinmod` corrigido foi sincronizado em `artifacts/`, `build/` e nas três cópias de `mods/`, além do ZIP de distribuição. A configuração da instalação principal e do ZIP também passou para `autoArmorEnabled: true` e limite preventivo de 30%, como nas duas cópias limpas; ela estava desligada e em 0%. A versão anterior do artefato está em `artifacts/YNYUtils.before-pending-recovery-2026-10-16.steinmod`. Validação: `VerifyRuntimeClasses` com `-Xverify:all`, `VerifyPackageLinks` (103 classes, 6896 links), `AutoArmorSafetyTest` (25 verificações) e `CheckPackConflicts.ps1`. Falta confirmar o comportamento em servidor real.
+
 
 

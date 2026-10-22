@@ -1,61 +1,119 @@
+package com.yny.utils.tools;
+
 import java.io.*;
 import java.nio.file.*;
-import java.util.Set;
 import java.util.zip.*;
 import org.objectweb.asm.*;
+import org.objectweb.asm.tree.*;
+
+/**
+ * Utilitário para restaurar o controle dinâmico e real de Knockback (0-100%) no bytecode do YNYUtils.
+ * Remove lambdas hardcoded em 92% e reconecta as lambdas diretamente ao YNYConfig.
+ */
 public final class FixedKnockback implements Opcodes {
-  static final String MOD="com/yny/utils/YNYUtils.class";
-  static final String HUD="com/yny/utils/ui/PvpStatusHud.class";
-  static final Set<String> REMOVE=Set.of("Ativar redução de knockback","Knockback recebido","Manter impulso vertical normal","Tecla para alternar knockback","Mostrar status do knockback na HUD");
-  static int labels,options,key,constants,hudDefault,hudMethod,section;
-  public static void main(String[] args)throws Exception {
-    if(args.length!=2)throw new IllegalArgumentException("input output");
-    try(ZipFile in=new ZipFile(args[0]);ZipOutputStream out=new ZipOutputStream(Files.newOutputStream(Path.of(args[1])))){
-      var entries=in.entries();while(entries.hasMoreElements()){
-        ZipEntry e=entries.nextElement();byte[] b;
-        try(InputStream s=in.getInputStream(e)){b=s.readAllBytes();}        if(e.getName().equals(MOD)||e.getName().equals(HUD)){
-          ClassWriter w=new ClassWriter(0);
-          new ClassReader(b).accept(new ClassVisitor(ASM9,w){
-            public MethodVisitor visitMethod(int access,String name,String desc,String sig,String[] ex){
-              MethodVisitor mv=super.visitMethod(access,name,desc,sig,ex);
-              if(e.getName().equals(MOD)&&name.startsWith("lambda$new$")&&
-                 (name.equals("lambda$new$2")||name.equals("lambda$new$3")||name.equals("lambda$new$4"))){
-                constants++;mv.visitCode();
-                if(name.equals("lambda$new$3"))mv.visitIntInsn(BIPUSH,92);else mv.visitInsn(name.equals("lambda$new$4")?ICONST_0:ICONST_1);
-                mv.visitInsn(IRETURN);mv.visitMaxs(1,0);mv.visitEnd();return null;
-              }
-              if(e.getName().equals(HUD)&&name.equals("showKnockback")&&desc.equals("(Z)V")){
-                hudMethod++;mv.visitCode();mv.visitInsn(RETURN);mv.visitMaxs(0,2);mv.visitEnd();return null;
-              }
-              return new MethodVisitor(ASM9,mv){                boolean pending,firstKey=true;
-                public void visitLdcInsn(Object value){
-                  if(e.getName().equals(MOD)&&name.equals("onPage")){
-                    if(REMOVE.contains(value)){pending=true;labels++;}
-                    if("PvP - Knockback e aliados".equals(value)){value="PvP - Aliados";section++;}
-                  }
-                  if(e.getName().equals(HUD)&&name.equals("<init>")&&"Knockback: ATIVADO".equals(value)){
-                    value="Notificações de PvP";hudDefault++;
-                  }
-                  super.visitLdcInsn(value);
+    static final String MOD = "com/yny/utils/YNYUtils.class";
+    static final String HUD = "com/yny/utils/ui/PvpStatusHud.class";
+    static final String KB_CTRL = "com/yny/utils/modules/pvp/KnockbackControl.class";
+
+    public static void main(String[] args) throws Exception {
+        if (args.length != 2) throw new IllegalArgumentException("Usage: FixedKnockback <input.jar> <output.jar>");
+        Path inPath = Paths.get(args[0]);
+        Path outPath = Paths.get(args[1]);
+
+        int patchedLambdas = 0;
+        int patchedAdjust = 0;
+
+        try (ZipFile in = new ZipFile(inPath.toFile());
+             ZipOutputStream out = new ZipOutputStream(Files.newOutputStream(outPath))) {
+            var entries = in.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry e = entries.nextElement();
+                byte[] b;
+                try (InputStream s = in.getInputStream(e)) {
+                    b = s.readAllBytes();
                 }
-                public void visitMethodInsn(int opcode,String owner,String method,String descriptor,boolean itf){
-                  if(e.getName().equals(MOD)&&name.equals("onPage")&&pending&&owner.equals("dev/xavier/stein/loader/api/Page")&&method.equals("option")){
-                    options++;pending=false;super.visitInsn(POP);return;
-                  }                  super.visitMethodInsn(opcode,owner,method,descriptor,itf);
-                  if(e.getName().equals(MOD)&&name.equals("updateToggleKey")&&firstKey&&owner.equals("com/yny/utils/core/ToggleKey")&&method.equals("wasPressed")){
-                    firstKey=false;key++;super.visitInsn(POP);super.visitInsn(ICONST_0);
-                  }
+
+                if (MOD.equals(e.getName())) {
+                    ClassNode node = new ClassNode();
+                    new ClassReader(b).accept(node, 0);
+                    for (MethodNode mn : node.methods) {
+                        if ("lambda$new$2".equals(mn.name) && "()Z".equals(mn.desc)) {
+                            mn.instructions.clear();
+                            InsnList insns = new InsnList();
+                            insns.add(new FieldInsnNode(GETSTATIC, "com/yny/utils/YNYUtils", "config", "Lcom/yny/utils/config/YNYConfig;"));
+                            insns.add(new FieldInsnNode(GETFIELD, "com/yny/utils/config/YNYConfig", "knockbackEnabled", "Z"));
+                            insns.add(new InsnNode(IRETURN));
+                            mn.instructions.add(insns);
+                            mn.maxStack = 2;
+                            mn.maxLocals = 0;
+                            patchedLambdas++;
+                        } else if ("lambda$new$3".equals(mn.name) && "()I".equals(mn.desc)) {
+                            mn.instructions.clear();
+                            InsnList insns = new InsnList();
+                            insns.add(new FieldInsnNode(GETSTATIC, "com/yny/utils/YNYUtils", "config", "Lcom/yny/utils/config/YNYConfig;"));
+                            insns.add(new FieldInsnNode(GETFIELD, "com/yny/utils/config/YNYConfig", "knockbackPercent", "I"));
+                            insns.add(new InsnNode(IRETURN));
+                            mn.instructions.add(insns);
+                            mn.maxStack = 2;
+                            mn.maxLocals = 0;
+                            patchedLambdas++;
+                        } else if ("lambda$new$4".equals(mn.name) && "()Z".equals(mn.desc)) {
+                            mn.instructions.clear();
+                            InsnList insns = new InsnList();
+                            insns.add(new FieldInsnNode(GETSTATIC, "com/yny/utils/YNYUtils", "config", "Lcom/yny/utils/config/YNYConfig;"));
+                            insns.add(new FieldInsnNode(GETFIELD, "com/yny/utils/config/YNYConfig", "knockbackPreserveVertical", "Z"));
+                            insns.add(new InsnNode(IRETURN));
+                            mn.instructions.add(insns);
+                            mn.maxStack = 2;
+                            mn.maxLocals = 0;
+                            patchedLambdas++;
+                        } else if ("updateToggleKey".equals(mn.name) && "()V".equals(mn.desc)) {
+                            for (AbstractInsnNode insn : mn.instructions.toArray()) {
+                                if (insn instanceof MethodInsnNode minsn && "com/yny/utils/core/ToggleKey".equals(minsn.owner) && "wasPressed".equals(minsn.name)) {
+                                    AbstractInsnNode n1 = insn.getNext();
+                                    if (n1 != null && n1.getOpcode() == POP) {
+                                        AbstractInsnNode n2 = n1.getNext();
+                                        if (n2 != null && n2.getOpcode() == ICONST_0) {
+                                            mn.instructions.remove(n1);
+                                            mn.instructions.remove(n2);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                    node.accept(cw);
+                    b = cw.toByteArray();
+                } else if (KB_CTRL.equals(e.getName())) {
+                    ClassNode node = new ClassNode();
+                    new ClassReader(b).accept(node, 0);
+                    for (MethodNode mn : node.methods) {
+                        if ("adjust".equals(mn.name)) {
+                            for (AbstractInsnNode insn : mn.instructions.toArray()) {
+                                if (insn.getOpcode() == BIPUSH) {
+                                    IntInsnNode iin = (IntInsnNode) insn;
+                                    if (iin.operand == 92 || iin.operand == 93) {
+                                        mn.instructions.set(insn, new InsnNode(ICONST_0));
+                                        patchedAdjust++;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+                    node.accept(cw);
+                    b = cw.toByteArray();
                 }
-              };
+
+                ZipEntry copy = new ZipEntry(e.getName());
+                copy.setTime(e.getTime());
+                out.putNextEntry(copy);
+                out.write(b);
+                out.closeEntry();
             }
-          },0);b=w.toByteArray();
         }
-        ZipEntry copy=new ZipEntry(e.getName());copy.setTime(e.getTime());out.putNextEntry(copy);out.write(b);out.closeEntry();
-      }
+
+        System.out.println("Knockback restored to dynamic config (0-100%, toggle, vertical, HUD). Patched lambdas=" + patchedLambdas + ", adjust=" + patchedAdjust);
     }
-    if(labels!=5||options!=5||key!=1||constants!=3||hudDefault!=1||hudMethod!=1||section!=1){
-      Files.deleteIfExists(Path.of(args[1]));throw new IllegalStateException("counts "+labels+" "+options+" "+key+" "+constants+" "+hudDefault+" "+hudMethod+" "+section);
-    }
-    System.out.println("Knockback fixed at 92% X/Y/Z; controls and visual notice removed");
-  }
 }

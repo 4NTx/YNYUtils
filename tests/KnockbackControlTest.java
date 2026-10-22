@@ -14,6 +14,10 @@ public final class KnockbackControlTest {
         check(KnockbackControl.scale(8000, 100) == 8000, "100% mantém X/Y/Z vanilla");
         check(KnockbackControl.scale(-8000, 100) == -8000, "100% mantém sinal negativo");
         check(KnockbackControl.scale(8000, 93) == 7440, "93% reduz impulso positivo");
+        check(KnockbackControl.scale(8000, 8) == 640, "8% reduz impulso positivo para exatamente 8%");
+        check(KnockbackControl.scale(-8000, 8) == -640, "8% reduz impulso negativo para exatamente 8%");
+        check(KnockbackControl.scale(5, 8) == 1, "impulso positivo pequeno nunca zera (não vira 0kb)");
+        check(KnockbackControl.scale(-5, 8) == -1, "impulso negativo pequeno nunca zera (não vira 0kb)");
         check(KnockbackControl.scale(-8000, 93) == -7440, "93% reduz impulso negativo");
         check(KnockbackControl.scale(0, 93) == 0, "impulso nulo permanece nulo");
 
@@ -53,6 +57,16 @@ public final class KnockbackControlTest {
                 && horizontal.motionZ == KnockbackControl.scale(z, 93)
                 && horizontal.motionY == originalY,
                 "preservar vertical afeta apenas X/Z");
+
+        KnockbackControl minClampTest = new KnockbackControl(() -> true, () -> 0,
+                () -> false, () -> false, () -> false);
+        localId.setInt(minClampTest, 42);
+        S12PacketEntityVelocity minPacket = new S12PacketEntityVelocity(42, 0.4, 0.42, -0.2);
+        adjust.invoke(minClampTest, minPacket);
+        check(minPacket.motionX == KnockbackControl.scale(x, 8)
+                && minPacket.motionY == KnockbackControl.scale(y, 8)
+                && minPacket.motionZ == KnockbackControl.scale(z, 8),
+                "KnockbackControl deve limitar redução ao mínimo de 8% recebido (nunca 0kb)");
         System.out.println("PASS: " + checks + " verificações Knockback");
     }
 

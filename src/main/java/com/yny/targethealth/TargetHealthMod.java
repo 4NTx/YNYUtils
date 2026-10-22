@@ -24,18 +24,18 @@ public final class TargetHealthMod {
         }
     }
 
-    public static void addOptions(Page page) {
-        page.section("Damage Indicator: vida e equipamento do alvo")
-            .option(Option.toggle("Exibir Damage Indicator: vida e equipamento do alvo", () -> settings.enabled, value -> {
+    public static void addMainOptions(Page page) {
+        page.section("Damage Indicator (Vida do Alvo)")
+            .option(Option.toggle("Exibir Damage Indicator na tela", () -> settings.enabled, value -> {
                 settings.enabled = value;
-                config.saveSoon();
-            }))
-            .option(Option.toggle("Exibir nome do alvo", () -> settings.showName, value -> {
-                settings.showName = value;
                 config.saveSoon();
             }))
             .option(Option.toggle("Exibir vida atual e máxima", () -> settings.showNumbers, value -> {
                 settings.showNumbers = value;
+                config.saveSoon();
+            }))
+            .option(Option.toggle("Exibir nome do alvo", () -> settings.showName, value -> {
+                settings.showName = value;
                 config.saveSoon();
             }))
             .option(Option.toggle("Exibir absorção na barra de vida", () -> settings.showAbsorption, value -> {
@@ -50,6 +50,10 @@ public final class TargetHealthMod {
                 settings.showArmorDurability = value;
                 config.saveSoon();
             }))
+            .option(Option.toggle("Exibir encantamentos dos itens", () -> settings.showEnchantments, value -> {
+                settings.showEnchantments = value;
+                config.saveSoon();
+            }))
             .option(Option.toggle("Exibir distância até o alvo", () -> settings.showDistance, value -> {
                 settings.showDistance = value;
                 config.saveSoon();
@@ -62,20 +66,16 @@ public final class TargetHealthMod {
                 settings.rangeIndex = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Ver através de folhagem", () -> settings.ignoreLeaves, value -> {
+            .option(Option.toggle("Ver através de folhagem (Damage Indicator)", () -> settings.ignoreLeaves, value -> {
                 settings.ignoreLeaves = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Ignorar manequins (armor stands)", () -> settings.ignoreArmorStands, value -> {
+            .option(Option.toggle("Ignorar manequins (Armor Stands)", () -> settings.ignoreArmorStands, value -> {
                 settings.ignoreArmorStands = value;
                 config.saveSoon();
             }))
-            .option(Option.toggle("Não exibir aliados nem grupo/clã", () -> settings.ignoreAllies, value -> {
+            .option(Option.toggle("Não exibir aliados nem clã no Damage Indicator", () -> settings.ignoreAllies, value -> {
                 settings.ignoreAllies = value;
-                config.saveSoon();
-            }))
-            .option(Option.color("Cor de destaque da HUD", () -> settings.accentColor, value -> {
-                settings.accentColor = value;
                 config.saveSoon();
             }))
             .option(Option.toggle("Mudar cor conforme a vida", () -> settings.dynamicHealthColor, value -> {
@@ -87,6 +87,10 @@ public final class TargetHealthMod {
                 settings.dynamicHealthColor = false;
                 config.saveSoon();
             }))
+            .option(Option.color("Cor de destaque da HUD", () -> settings.accentColor, value -> {
+                settings.accentColor = value;
+                config.saveSoon();
+            }))
             .option(Option.cycle("Transparência do fundo", OPACITIES, () -> settings.opacityIndex, value -> {
                 settings.opacityIndex = value;
                 config.saveSoon();
@@ -94,5 +98,13 @@ public final class TargetHealthMod {
             .restore(() -> {
                 settings = config.reset();
             });
+    }
+
+    public static void addAdvancedOptions(Page page) {
+        // Opções já unificadas na seção principal do Damage Indicator
+    }
+
+    public static void addOptions(Page page) {
+        addMainOptions(page);
     }
 }

@@ -13,10 +13,8 @@ import dev.xavier.stein.loader.api.Targeting;
 import dev.xavier.stein.loader.api.Targeting.Hit;
 import dev.xavier.stein.loader.api.Targeting.Query;
 import dev.xavier.stein.loader.api.Targeting.Ray;
+import java.lang.reflect.Method;
 import java.util.Locale;
-import net.minecraft.entity.EntityLivingBase;
-import net.minecraft.entity.item.EntityArmorStand;
-import net.minecraft.item.ItemStack;
 
 public final class TargetHealthElement implements HudElement {
    private static final int MIN_WIDTH = 250;
@@ -24,7 +22,7 @@ public final class TargetHealthElement implements HudElement {
    private static final double[] RANGES = new double[]{8.0D, 16.0D, 32.0D, 48.0D, 64.0D};
    private static final int[] OPACITIES = new int[]{90, 130, 176, 220};
    private static final String[] ARMOR_LABELS = new String[]{"CAP", "PEI", "CAL", "BOT"};
-   private EntityLivingBase target;
+   private Object target;
    private String name = "Target";
    private String healthText = "20 / 20";
    private String heldName = "Mão vazia";
@@ -36,11 +34,76 @@ public final class TargetHealthElement implements HudElement {
    private int armorPoints;
    private float animatedHealth = 20.0F;
    private float damageTrailHealth = 20.0F;
-   private ItemStack heldItem;
-   private final ItemStack[] armor = new ItemStack[4];
-   private EntityLivingBase distantTarget;
+   private Object heldItem;
+   private final Object[] armor = new Object[4];
+   private Object distantTarget;
    private int scanCooldown;
    private long animationAt;
+
+   private static Method heldItemMethod;
+   private static Method armorItemMethod;
+   private static boolean reflectionInitialized;
+
+   private static synchronized void initReflection(Class<?> clazz) {
+      if (reflectionInitialized || clazz == null) return;
+      Class<?> cur = clazz;
+      while (cur != null && cur != Object.class) {
+         if (heldItemMethod == null) {
+            for (String mName : new String[]{"bA", "getHeldItem", "d"}) {
+               try {
+                  Method m = cur.getDeclaredMethod(mName);
+                  m.setAccessible(true);
+                  heldItemMethod = m;
+                  break;
+               } catch (Throwable ignored) {}
+            }
+         }
+         if (armorItemMethod == null) {
+            for (String mName : new String[]{"q", "getCurrentArmor", "p"}) {
+               try {
+                  Method m = cur.getDeclaredMethod(mName, Integer.TYPE);
+                  m.setAccessible(true);
+                  armorItemMethod = m;
+                  break;
+               } catch (Throwable ignored) {}
+            }
+         }
+         if (heldItemMethod != null && armorItemMethod != null) {
+            reflectionInitialized = true;
+            return;
+         }
+         cur = cur.getSuperclass();
+      }
+   }
+
+   private static Object getHeldItem(Object living) {
+      if (living == null) return null;
+      try {
+         if (!reflectionInitialized) initReflection(living.getClass());
+         if (heldItemMethod != null) return heldItemMethod.invoke(living);
+      } catch (Throwable ignored) {}
+      return null;
+   }
+
+   private static Object getArmorItem(Object living, int slot) {
+      if (living == null) return null;
+      try {
+         if (!reflectionInitialized) initReflection(living.getClass());
+         if (armorItemMethod != null) return armorItemMethod.invoke(living, slot);
+      } catch (Throwable ignored) {}
+      return null;
+   }
+
+   private static boolean isArmorStand(Object entity) {
+      if (entity == null) return false;
+      String cName = entity.getClass().getName();
+      if (cName.equals("um") || cName.endsWith(".EntityArmorStand")) return true;
+      try {
+         String type = Entities.typeName(entity);
+         if (type != null && type.toLowerCase(Locale.ROOT).contains("armorstand")) return true;
+      } catch (Throwable ignored) {}
+      return false;
+   }
 
    public void updateDistantTarget() {
       Object self = Entities.self();
@@ -59,7 +122,7 @@ public final class TargetHealthElement implements HudElement {
          return;
       }
       double reach = range();
-      scanCooldown = reach >= 48.0D ? 3 : 1;
+      scanCooldown = reach >= 48.0D ? 4 : 2;
       Query query = Targeting.query().reach(reach).living().margin(0.3D).cutAtBlock().exclude(self);
       if (TargetHealthMod.settings.ignoreLeaves) query.passThrough(Targeting.FOLIAGE);
       distantTarget = firstDisplayableTarget(Targeting.raycast(query));
@@ -67,8 +130,8 @@ public final class TargetHealthElement implements HudElement {
 
    public void updateTarget() {
       Object candidate = TargetGrace.choose(findTarget(), target);
-      if (!(candidate instanceof EntityLivingBase) || isIgnoredTarget(candidate)) {
-         if (target != null) DebugLog.state("DamageIndicator", "target", "none");
+      if (candidate == null || !Entities.isLiving(candidate) || isIgnoredTarget(candidate)) {
+         if (target != null && DebugLog.isEnabled()) DebugLog.state("DamageIndicator", "target", "none");
          target = null;
          heldItem = null;
          heldName = "Mão vazia";
@@ -79,22 +142,37 @@ public final class TargetHealthElement implements HudElement {
          advanceAnimation(System.currentTimeMillis());
          return;
       }
-      EntityLivingBase next = (EntityLivingBase)candidate;
+      Object next = candidate;
       boolean changed = next != target;
       target = next;
       name = TargetClanName.display(next);
-      if (changed) DebugLog.state("DamageIndicator", "target", name);
-      float nextHealth = Math.max(0.0F, HealthEventLatch.health(Entities.health(next), next));
+      if (changed && DebugLog.isEnabled()) DebugLog.state("DamageIndicator", "target", name);
+      float entityHealth = Entities.health(next);
       float nextMaximum = Math.max(1.0F, Entities.maxHealth(next));
       float nextAbsorption = Math.max(0.0F, HealthEventLatch.absorption(Entities.absorption(next), next));
+
+      // Leitura de vida em tempo real pelos corações acima da cabeça (Scoreboard Below-Name ou Nametag)
+      Float heartHealth = TargetHeartHealth.getRealTimeHealth(next, Entities.name(next));
+      float nextHealth;
+      if (heartHealth != null && heartHealth >= 0.0F) {
+         nextHealth = heartHealth.floatValue();
+         if (nextHealth > nextMaximum) {
+            nextMaximum = nextHealth;
+         }
+      } else {
+         nextHealth = Math.max(0.0F, HealthEventLatch.health(entityHealth, next));
+      }
+
       armorPoints = Math.max(0, Entities.armor(next));
       acceptHealth(nextHealth, nextMaximum, nextAbsorption, changed, System.currentTimeMillis());
       Object self = Entities.self();
       distanceText = self == null ? "" : String.format(Locale.ROOT, "%.1fm", (double)Entities.distance(self, next));
       readEquipment(next);
-      DebugLog.state("DamageIndicator", "distance", DistanceLog.bucket(distanceText));
-      DebugLog.state("DamageIndicator", "held", heldName + "; durability=" + heldDurability);
-      DebugLog.state("DamageIndicator", "armor", armorSummary());
+      if (DebugLog.isEnabled()) {
+         DebugLog.state("DamageIndicator", "distance", DistanceLog.bucket(distanceText));
+         DebugLog.state("DamageIndicator", "held", heldName + "; durability=" + heldDurability);
+         DebugLog.state("DamageIndicator", "armor", armorSummary());
+      }
    }
 
    public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
@@ -112,7 +190,7 @@ public final class TargetHealthElement implements HudElement {
       maximum = nextMaximum;
       absorption = nextAbsorption;
       healthText = format(health) + " / " + format(maximum);
-      if (Math.abs(health - priorHealth) > 0.01F) DebugLog.write("DamageIndicator", "health=" + format(priorHealth) + "->" + format(health) + "; max=" + format(maximum) + "; absorption=" + format(absorption));
+      if (DebugLog.isEnabled() && Math.abs(health - priorHealth) > 0.01F) DebugLog.write("DamageIndicator", "health=" + format(priorHealth) + "->" + format(health) + "; max=" + format(maximum) + "; absorption=" + format(absorption));
       if (changed || animationAt == 0L) {
          animatedHealth = health;
          damageTrailHealth = health;
@@ -141,24 +219,24 @@ public final class TargetHealthElement implements HudElement {
       if (animatedHealth >= health) damageTrailHealth = Math.max(health, damageTrailHealth - elapsed * 10.0F);
    }
 
-   private void readEquipment(EntityLivingBase living) {
-      heldItem = living.getHeldItem();
+   private void readEquipment(Object living) {
+      heldItem = getHeldItem(living);
       heldName = heldItem == null ? "Mão vazia / sem dados" : safeStackName(heldItem);
       heldDurability = heldItem == null ? "" : durability(heldItem);
-      for (int i = 0; i < armor.length; i++) armor[i] = living.getCurrentArmor(3 - i);
+      for (int i = 0; i < armor.length; i++) armor[i] = getArmorItem(living, 3 - i);
    }
 
    private String armorSummary() {
       StringBuilder value = new StringBuilder();
       for (int i = 0; i < armor.length; i++) {
          if (i > 0) value.append(" | ");
-         ItemStack stack = armor[i];
+         Object stack = armor[i];
          value.append(ARMOR_LABELS[i]).append("=").append(stack == null ? "empty" : safeStackName(stack) + "; durability=" + durability(stack));
       }
       return value.toString();
    }
 
-   private static String durability(ItemStack stack) {
+   private static String durability(Object stack) {
       if (stack == null || !Stacks.isDamageable(stack)) return "Sem desgaste";
       int max = Math.max(0, Stacks.maxDamage(stack));
       if (max == 0) return "Sem desgaste";
@@ -166,14 +244,14 @@ public final class TargetHealthElement implements HudElement {
       return (max - damage) + "/" + max;
    }
 
-   private static String safeStackName(ItemStack stack) {
+   private static String safeStackName(Object stack) {
       try {
          String value = Stacks.name(stack);
          return value == null || value.trim().isEmpty() ? "Item" : value;
       } catch (Throwable ignored) { return "Item"; }
    }
 
-   private static String safeDisplayName(EntityLivingBase entity) {
+   private static String safeDisplayName(Object entity) {
       try {
          String value = Entities.displayName(entity);
          if (value != null && !value.trim().isEmpty()) return value;
@@ -182,10 +260,14 @@ public final class TargetHealthElement implements HudElement {
       return value == null || value.trim().isEmpty() ? "Alvo" : value;
    }
 
-   private EntityLivingBase findTarget() {
+   private Object findTarget() {
+      Object focusTarget = com.yny.utils.modules.pvp.FocusMode.getCurrentFocusTarget();
+      if (focusTarget != null && Entities.isLiving(focusTarget) && !isIgnoredTarget(focusTarget)) return focusTarget;
       Object direct = directTarget();
-      if (direct instanceof EntityLivingBase && !isIgnoredTarget(direct)) return (EntityLivingBase)direct;
-      return distantTarget != null && !distantTarget.isDead && !isIgnoredTarget(distantTarget) ? distantTarget : null;
+      if (direct != null && Entities.isLiving(direct) && !isIgnoredTarget(direct)) return direct;
+      Object webTarget = com.yny.utils.modules.pvp.HitThroughWeb.findTargetThroughWeb();
+      if (webTarget != null && Entities.isLiving(webTarget) && !isIgnoredTarget(webTarget)) return webTarget;
+      return distantTarget != null && Entities.isAlive(distantTarget) && !isIgnoredTarget(distantTarget) ? distantTarget : null;
    }
 
    private static Object directTarget() {
@@ -194,27 +276,29 @@ public final class TargetHealthElement implements HudElement {
       return candidate != null && candidate != self && Entities.isLiving(candidate) ? candidate : null;
    }
 
-   private static EntityLivingBase firstDisplayableTarget(Ray ray) {
+   private static Object firstDisplayableTarget(Ray ray) {
       if (ray == null) return null;
       for (Hit hit : ray.hits) {
          if (hit.distance >= ray.blockDistance) break;
-         if (hit.entity instanceof EntityLivingBase && !isIgnoredTarget(hit.entity)) return (EntityLivingBase)hit.entity;
+         if (hit.entity != null && Entities.isLiving(hit.entity) && !isIgnoredTarget(hit.entity)) return hit.entity;
       }
       return null;
    }
 
    public static boolean isIgnoredTarget(Object entity) {
       if (entity == null) return true;
-      if (TargetHealthMod.settings.ignoreArmorStands && entity instanceof EntityArmorStand) return true;
+      if (TargetHealthMod.settings.ignoreArmorStands && isArmorStand(entity)) return true;
+      if (com.yny.utils.modules.clanping.PingClanName.isDuelTarget(entity)) return false;
+      Relation rel = null;
       try {
-         Relation rel = Relations.of(entity);
+         rel = Relations.of(entity);
          if (rel == Relation.GROUP || rel == Relation.SELF) return true;
       } catch (Throwable ignored) {}
       try {
          String nick = Entities.name(entity);
          if (com.yny.utils.modules.clanping.PingClanName.isSameClan(entity, nick)) return true;
       } catch (Throwable ignored) {}
-      return TargetHealthMod.settings.ignoreAllies && Relations.of(entity).friendly();
+      return TargetHealthMod.settings.ignoreAllies && rel != null && rel.friendly();
    }
 
    public String id() { return TargetHealthMod.ID + ".target"; }
@@ -320,7 +404,7 @@ public final class TargetHealthElement implements HudElement {
       }
    }
 
-   private void drawItemCell(ItemStack stack, int x, int y) {
+   private void drawItemCell(Object stack, int x, int y) {
       if (stack == null) {
          Render.text("—", x + 15, y + 19, 0xFF728194, false);
          return;
@@ -342,6 +426,3 @@ public final class TargetHealthElement implements HudElement {
    }
    public HudPlacement defaultPlacement() { return new HudPlacement(1, 1, 0, 28, 1.0F, true, false); }
 }
-
-
-

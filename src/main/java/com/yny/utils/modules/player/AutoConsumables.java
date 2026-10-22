@@ -150,11 +150,13 @@ public final class AutoConsumables {
         }
         String blocked = guardReason(mc, player);
         if (blocked != null) {
-            trace(0, "blocked-" + blocked, "ativo=" + enabled.getAsBoolean()
-                    + "; damageEpoch=" + damageEpoch
-                    + "; held=" + (player == null ? "sem-jogador" : describe(player.getHeldItem())));
-            trace(1, "blocked-" + blocked, "auto pot pausado");
-            trace(2, "blocked-" + blocked, "auto pot pausado");
+            if (!"module-off".equals(blocked)) {
+                trace(0, "blocked-" + blocked, "ativo=" + enabled.getAsBoolean()
+                        + "; damageEpoch=" + damageEpoch
+                        + "; held=" + (player == null ? "sem-jogador" : describe(player.getHeldItem())));
+                trace(1, "blocked-" + blocked, "auto pot pausado");
+                trace(2, "blocked-" + blocked, "auto pot pausado");
+            }
             return;
         }
 
@@ -225,6 +227,10 @@ public final class AutoConsumables {
         }
     }
 
+    public boolean isControllingUseKey() {
+        return this.pendingUse != null;
+    }
+
     private void markCombat() {
         int duration = clamp(combatSeconds.getAsInt(), 1, 15);
         combatUntil = tick + duration * TICKS_PER_SECOND;
@@ -240,7 +246,7 @@ public final class AutoConsumables {
         if (mc.playerController.isInCreativeMode()) return "creative";
         if (Inventory.isContainerOpen()) return "container-open";
         if (Inventory.windowId() != 0) return "window-" + Inventory.windowId();
-        if (Inventory.cursor() != null) return "cursor-occupied";
+        if (Inventory.cursor() != null || !PriorityBus.canUseConsumable()) return "cursor-occupied";
         if (player.isUsingItem()) return "manual-item-use";
         return null;
     }
@@ -266,7 +272,7 @@ public final class AutoConsumables {
     }
 
     private void trace(int kind, String reason, String detail) {
-        if (!diagnostics.getAsBoolean()) {
+        if (!diagnostics.getAsBoolean() || !com.yny.utils.core.DebugLog.isEnabled()) {
             return;
         }
         if (!reason.equals(lastDecision[kind]) || tick - lastDecisionAt[kind] >= TICKS_PER_SECOND) {
@@ -312,6 +318,7 @@ public final class AutoConsumables {
                     startingCount, potionEffectId, effectDuration, effectAmplifier,
                     effectDuration(player, Potion.regeneration), effectAmplifier(player, Potion.regeneration),
                     effectDuration(player, Potion.absorption), effectAmplifier(player, Potion.absorption));
+            PriorityBus.setActiveConsumableSlot(hotbarSlot);
             mc().gameSettings.keyBindUseItem.pressed = true;
             log("uso iniciado: slot=" + hotbarSlot + ", item=" + held.getItem().getUnlocalizedName()
                     + ", count=" + startingCount + ", localUsing=" + using
@@ -425,6 +432,7 @@ public final class AutoConsumables {
             Inventory.selectHotbar(finished.previousSlot);
         }
         pendingUse = null;
+        PriorityBus.setActiveConsumableSlot(-1);
     }
 
     private static ItemStack hotbarStack(int slot) {
@@ -519,6 +527,7 @@ public final class AutoConsumables {
         }
         nextFailedUseRetryTick[pendingUse.kind] = tick + FAILED_USE_RETRY_TICKS;
         pendingUse = null;
+        PriorityBus.setActiveConsumableSlot(-1);
     }
 
     private static void restoreUseKey() {

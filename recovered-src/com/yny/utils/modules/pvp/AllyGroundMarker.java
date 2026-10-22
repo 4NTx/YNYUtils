@@ -1,5 +1,6 @@
 package com.yny.utils.modules.pvp;
 
+import com.yny.utils.core.SafeEntities;
 import dev.xavier.stein.loader.api.Relation;
 import dev.xavier.stein.loader.api.Relations;
 import org.lwjgl.opengl.GL11;
@@ -22,14 +23,17 @@ public final class AllyGroundMarker {
          GL11.glLineWidth(2.0F);
 
          try {
-            for (Object var11 : var2.f.j) {
-               if (var11 instanceof wn var12 && var12 != var2.h && var12.ai()) {
-                  Relation var13 = Relations.of(var12);
-                  if (var13 == Relation.GROUP) {
-                     double var14 = var12.P + (var12.s - var12.P) * var1 - var4;
-                     double var16 = var12.Q + (var12.t - var12.Q) * var1 - var6 + 0.025;
-                     double var18 = var12.R + (var12.u - var12.R) * var1 - var8;
-                     drawRing(var14, var16, var18, Math.max(0.32, var12.J * 0.72));
+            for (Object var11 : SafeEntities.safePlayers()) {
+               if (var11 instanceof wn) {
+                  wn var12 = (wn) var11;
+                  if (var12 != var2.h && var12.ai()) {
+                     Relation var13 = Relations.of(var12);
+                     if (var13 == Relation.GROUP) {
+                        double var14 = var12.P + (var12.s - var12.P) * var1 - var4;
+                        double var16 = var12.Q + (var12.t - var12.Q) * var1 - var6 + 0.025;
+                        double var18 = var12.R + (var12.u - var12.R) * var1 - var8;
+                        drawRing(var14, var16, var18, Math.max(0.32, var12.J * 0.72));
+                     }
                   }
                }
             }

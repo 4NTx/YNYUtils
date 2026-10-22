@@ -17,12 +17,12 @@ public final class KnockbackControl {
    private final BooleanSupplier enabled;
    private final IntSupplier percent;
    private final BooleanSupplier preserveVertical;
-   private final BooleanSupplier diagnostics;
+   final BooleanSupplier diagnostics;
    private final BiConsumer<Integer, Integer> localVelocityListener;
    private final Runnable velocityAppliedListener;
    private final ArrayBlockingQueue<KnockbackControl.VelocitySample> samples = new ArrayBlockingQueue<>(128);
    private final AtomicInteger droppedSamples = new AtomicInteger();
-   private final AtomicInteger serverCorrections = new AtomicInteger();
+   final AtomicInteger serverCorrections = new AtomicInteger();
    private KnockbackControl.DisplacementTrace displacement;
    private volatile int localPlayerId = Integer.MIN_VALUE;
    private volatile Channel installedChannel;
@@ -139,7 +139,7 @@ public final class KnockbackControl {
       this.displacement = null;
    }
 
-   private KnockbackControl.VelocitySample adjust(hm var1) {
+   KnockbackControl.VelocitySample adjust(hm var1) {
       if (var1.a() != this.localPlayerId) {
          return null;
       }
@@ -150,7 +150,7 @@ public final class KnockbackControl {
       DebugLog.write("Knockback", "S12 local recebido; bruto=(" + var2 + "," + var3 + "," + var4 + ")");
       this.localVelocityListener.accept(var2, var4);
       boolean var5 = this.enabled.getAsBoolean();
-      int var6 = var5 ? Math.max(92, Math.min(100, this.percent.getAsInt())) : 100;
+      int var6 = var5 ? Math.max(8, Math.min(100, this.percent.getAsInt())) : 100;
       boolean var7 = this.preserveVertical.getAsBoolean();
       if (var5 && var6 != 100) {
          var1.b = scale(var1.b, var6);
@@ -169,7 +169,7 @@ public final class KnockbackControl {
       return var8;
    }
 
-   private void afterVelocityHandled(KnockbackControl.VelocitySample var1, Channel var2) {
+   void afterVelocityHandled(KnockbackControl.VelocitySample var1, Channel var2) {
       ave var3 = ave.A();
       bew var4 = var3.h;
       if (var2 == this.installedChannel && var4 != null && var3.f != null && var4.F() == var1.entityId) {
@@ -218,7 +218,12 @@ public final class KnockbackControl {
    }
 
    static int scale(int var0, int var1) {
-      return Math.round(var0 * (var1 / 100.0F));
+      if (var0 == 0) return 0;
+      int scaled = Math.round(var0 * (var1 / 100.0F));
+      if (scaled == 0) {
+         return var0 > 0 ? 1 : -1;
+      }
+      return scaled;
    }
 
    private static final class DisplacementTrace {

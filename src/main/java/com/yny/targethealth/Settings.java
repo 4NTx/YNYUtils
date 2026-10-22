@@ -9,6 +9,7 @@ final class Settings {
     boolean showDistantTargets = true;
     boolean showHeldItem = true;
     boolean showArmorDurability = true;
+    boolean showEnchantments = true;
     boolean showDistance = true;
     boolean ignoreLeaves;
     boolean ignoreArmorStands = true;

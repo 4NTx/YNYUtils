@@ -1,0 +1,20 @@
+# Build output (build/libs/<Name>.steinmod) and Gradle's own files
+build/
+.gradle/
+out/
+bin/
+*.class
+logs/
+crash-reports/
+
+# Jars in libs/ are another mod's API, only for compiling; they are not committed.
+libs/
+*.jar
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# The Gradle wrapper is what lets "./gradlew build" run without Gradle installed.
+!gradle/wrapper/gradle-wrapper.jar

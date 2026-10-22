@@ -53,7 +53,7 @@ public final class ArmorPickupFilter {
     }
 
     public static void onSlotChanged(int window, int slot, Object stack, YNYConfig config) {
-        if (window != 0 || config == null || !config.autoArmorDiscardReceived) return;
+        if (window != 0 || config == null || !config.autoArmorEnabled || !config.autoArmorDiscardReceived) return;
         int index = Inventory.inventoryIndexOf(slot);
         if (index < 0 || index >= 36) return;
         if (index == Inventory.selectedHotbar()) return; // Never discard active held item
@@ -91,7 +91,7 @@ public final class ArmorPickupFilter {
             initialized = true;
             return false;
         }
-        if (config == null || !config.autoArmorDiscardReceived) {
+        if (config == null || !config.autoArmorEnabled || !config.autoArmorDiscardReceived) {
             Arrays.fill(queued, false);
             Arrays.fill(dropAttempts, 0);
             snapshot();
@@ -208,7 +208,7 @@ public final class ArmorPickupFilter {
     }
 
     public static boolean reject(Object stack, YNYConfig config) {
-        if (stack == null || config == null || !config.autoArmorDiscardReceived) return false;
+        if (stack == null || config == null || !config.autoArmorEnabled || !config.autoArmorDiscardReceived) return false;
         int piece = Inventory.armorPiece(stack);
         if (piece < 0) return false;
         // Never discard armor if the player has an empty or broken slot for this piece!
@@ -220,7 +220,11 @@ public final class ArmorPickupFilter {
         int remaining = max - Stacks.damage(stack);
         boolean enchanted = Stacks.isEnchanted(stack);
         int protection = Stacks.enchantLevel(stack, 0); // 0 = Protection in Minecraft 1.8.9
-        return ArmorPickupPolicy.shouldDiscard(config, piece, remaining, max, enchanted, protection);
+        int fireProt = Stacks.enchantLevel(stack, 1);   // 1 = Fire Protection
+        int blastProt = Stacks.enchantLevel(stack, 3);  // 3 = Blast Protection
+        int projProt = Stacks.enchantLevel(stack, 4);   // 4 = Projectile Protection
+        int effectiveProtection = Math.max(protection, Math.max(fireProt, Math.max(blastProt, projProt)));
+        return ArmorPickupPolicy.shouldDiscard(config, piece, remaining, max, enchanted, effectiveProtection);
     }
 
     private static boolean isBrokenStack(Object stack) {
@@ -229,3 +233,4 @@ public final class ArmorPickupFilter {
         return max > 0 && Stacks.damage(stack) >= max;
     }
 }
+

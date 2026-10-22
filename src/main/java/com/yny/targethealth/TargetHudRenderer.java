@@ -4,24 +4,81 @@ import dev.xavier.stein.loader.api.Entities;
 import dev.xavier.stein.loader.api.Option;
 import dev.xavier.stein.loader.api.Render;
 import dev.xavier.stein.loader.api.Stacks;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Modern, compact and responsive HUD renderer for Damage Indicator.
- * Dynamically adjusts vertical size and only displays equipment when present.
+ * Dynamically adjusts vertical size and only displays equipment when present with zero-allocation caching.
  */
 public final class TargetHudRenderer {
 
     public static final int WIDTH = 220;
     public static final int BASE_HEIGHT = 32;
-    public static final int FULL_HEIGHT = 58;
+    public static final int FULL_HEIGHT = 68;
 
     private static final int[] OPACITIES = {90, 130, 176, 220};
+
+    private static final Map<Integer, String> ENCH_ABBR = new HashMap<>();
+    private static final Map<Integer, String> ENCH_COLOR = new HashMap<>();
+    private static final Map<Integer, Integer> ENCH_PRIORITY = new HashMap<>();
+
+    static {
+        // Armor
+        regEnch(0, "P", "§b", 100);       // Protection
+        regEnch(1, "FP", "§c", 95);      // Fire Protection
+        regEnch(2, "FF", "§a", 85);      // Feather Falling
+        regEnch(3, "BP", "§6", 90);      // Blast Protection
+        regEnch(4, "PP", "§e", 90);      // Projectile Protection
+        regEnch(5, "Res", "§9", 70);     // Respiration
+        regEnch(6, "AA", "§3", 70);      // Aqua Affinity
+        regEnch(7, "Th", "§d", 80);      // Thorns
+        regEnch(8, "DS", "§3", 75);      // Depth Strider
+
+        // Weapons
+        regEnch(16, "S", "§c", 100);     // Sharpness
+        regEnch(17, "Sm", "§b", 95);     // Smite
+        regEnch(18, "Boa", "§4", 70);    // Bane of Arthropods
+        regEnch(19, "Kb", "§e", 80);     // Knockback
+        regEnch(20, "F", "§6", 90);      // Fire Aspect
+        regEnch(21, "Loot", "§a", 60);   // Looting
+
+        // Bows
+        regEnch(48, "P", "§c", 100);     // Power
+        regEnch(49, "Pu", "§e", 80);     // Punch
+        regEnch(50, "Fl", "§6", 90);     // Flame
+        regEnch(51, "Inf", "§d", 90);    // Infinity
+
+        // Tools
+        regEnch(32, "Eff", "§b", 90);    // Efficiency
+        regEnch(33, "Silk", "§a", 85);   // Silk Touch
+        regEnch(35, "Fort", "§6", 85);   // Fortune
+
+        // Durability
+        regEnch(34, "U", "§7", 50);      // Unbreaking
+    }
+
+    private static void regEnch(int id, String abbr, String color, int prio) {
+        ENCH_ABBR.put(id, abbr);
+        ENCH_COLOR.put(id, color);
+        ENCH_PRIORITY.put(id, prio);
+    }
 
     private static Object[] previewArmor;
     private static Object previewSword;
     private static boolean previewInitialized;
+
+    private static final Map<Integer, String> BADGE_CACHE = new ConcurrentHashMap<>();
+    private static Method mTagListMojang, mTagListNotch;
+    private static Method mCountMojang, mCountNotch;
+    private static Method mGetTagMojang, mGetTagNotch;
+    private static Method mGetShortMojang, mGetShortNotch;
+    private static volatile boolean nbtMethodsInitialized = false;
 
     private TargetHudRenderer() {
     }
@@ -144,14 +201,14 @@ public final class TargetHudRenderer {
             int count = items.size();
             if (count > 0) {
                 int cellW = 36;
-                int cellH = 23;
+                int cellH = 34;
                 int gap = 3;
                 int totalW = count * cellW + (count - 1) * gap;
                 float startX = x + (width - totalW) / 2.0F;
-                float equipY = 31;
+                float equipY = 29;
                 for (int i = 0; i < count; i++) {
                     float cX = startX + i * (cellW + gap);
-                    drawItemCell(items.get(i), cX, equipY, cellW, cellH);
+                    drawItemCell(items.get(i), cX, equipY, cellW, cellH, target == null, i);
                 }
             }
         }
@@ -197,43 +254,213 @@ public final class TargetHudRenderer {
         }
     }
 
-    private static void drawItemCell(Object stack, float cellX, float cellY, int cellW, int cellH) {
+    private static void drawItemCell(Object stack, float cellX, float cellY, int cellW, int cellH, boolean isPreview, int itemIndex) {
         if (stack == null) return;
 
         // Container cell background
         Render.roundRect(cellX, cellY, cellW, cellH, 2.0F, 0x4D101822);
 
-        // Item icon centered
-        try {
-            Render.item(stack, (int)(cellX + (cellW - 16) / 2.0F), (int)(cellY + 1), true);
-        } catch (Throwable ignored) { }
+        // Enchantment badge
+        String ench = TargetHealthMod.settings.showEnchantments ? getEnchantBadges(stack) : null;
+        if (ench == null && isPreview && TargetHealthMod.settings.showEnchantments) {
+            ench = getPreviewEnchant(itemIndex);
+        }
 
         // Durability / Stack count
+        String duraStr = "";
+        int duraColor = 0xFFB7C5D4;
         try {
             if (Stacks.isDamageable(stack)) {
                 int max = Math.max(0, Stacks.maxDamage(stack));
                 int dam = Math.max(0, Math.min(max, Stacks.damage(stack)));
                 int rem = max - dam;
                 float pct = max > 0 ? (float)rem / (float)max : 1.0F;
-                int duraColor = pct > 0.50F ? 0xFFB7C5D4 : (pct > 0.20F ? 0xFFFFE066 : 0xFFFF5555);
-
-                String full = rem + "/" + max;
-                String str = Render.textWidth(full) <= cellW - 2 ? full : String.valueOf(rem);
-                int strW = Render.textWidth(str);
-                Render.text(str, cellX + (cellW - strW) / 2.0F, cellY + 14, duraColor, false);
+                duraColor = pct > 0.50F ? 0xFFB7C5D4 : (pct > 0.20F ? 0xFFFFE066 : 0xFFFF5555);
+                duraStr = String.valueOf(rem);
             } else {
                 int count = Stacks.count(stack);
                 if (count > 1) {
-                    String str = "x" + count;
-                    int strW = Render.textWidth(str);
-                    Render.text(str, cellX + (cellW - strW) / 2.0F, cellY + 14, 0xFFE0E0E0, false);
+                    duraStr = "x" + count;
+                    duraColor = 0xFFE0E0E0;
                 }
             }
         } catch (Throwable ignored) { }
+
+        boolean hasEnch = ench != null && !ench.isEmpty();
+
+        // Icon position: slightly higher if item has enchantments below it
+        float iconY = hasEnch ? (cellY + 1.5F) : (cellY + 4.0F);
+        try {
+            Render.item(stack, (int)(cellX + (cellW - 16) / 2.0F), (int)iconY, true);
+        } catch (Throwable ignored) { }
+
+        // Render Enchantment Badge (centered, 0.70x scale)
+        if (hasEnch) {
+            float enchScale = 0.70F;
+            int enchW = (int) Math.ceil(Render.textWidth(ench) * enchScale);
+            float enchX = cellX + (cellW - enchW) / 2.0F;
+            Render.push();
+            Render.translate(enchX, cellY + 17.5F);
+            Render.scale(enchScale);
+            Render.text(ench, 0, 0, 0xFFFFFFFF, true);
+            Render.pop();
+        }
+
+        // Render Durability / Count (centered)
+        if (!duraStr.isEmpty()) {
+            float duraScale = hasEnch ? 0.70F : 0.75F;
+            float duraY = hasEnch ? (cellY + 25.5F) : (cellY + 22.0F);
+            int duraW = (int) Math.ceil(Render.textWidth(duraStr) * duraScale);
+            float duraX = cellX + (cellW - duraW) / 2.0F;
+            Render.push();
+            Render.translate(duraX, duraY);
+            Render.scale(duraScale);
+            Render.text(duraStr, 0, 0, duraColor, true);
+            Render.pop();
+        }
+    }
+
+    public static String getPreviewEnchant(int itemIndex) {
+        switch (itemIndex) {
+            case 0: return "§bP4 §7U3";
+            case 1: return "§bP4 §7U3";
+            case 2: return "§bP4 §7U3";
+            case 3: return "§bP4 §aFF4";
+            case 4: return "§cS5 §6F2";
+            default: return "§bP4";
+        }
+    }
+
+    public static class EnchantmentData {
+        public final int id;
+        public final int level;
+        public final int priority;
+
+        public EnchantmentData(int id, int level, int priority) {
+            this.id = id;
+            this.level = level;
+            this.priority = priority;
+        }
+    }
+
+    private static synchronized void initNbtMethods(Class<?> stackCls) {
+        if (nbtMethodsInitialized) return;
+        nbtMethodsInitialized = true;
+        try {
+            try { mTagListNotch = stackCls.getMethod("p"); } catch (Throwable ignored) {}
+            try { mTagListMojang = stackCls.getMethod("getEnchantmentTagList"); } catch (Throwable ignored) {}
+        } catch (Throwable ignored) {}
+    }
+
+    public static List<EnchantmentData> getEnchantments(Object stack) {
+        List<EnchantmentData> result = new ArrayList<>();
+        if (stack == null) return result;
+        try {
+            if (!Stacks.isEnchanted(stack)) return result;
+        } catch (Throwable ignored) {
+            return result;
+        }
+
+        boolean readViaNbt = false;
+        try {
+            if (!nbtMethodsInitialized) initNbtMethods(stack.getClass());
+            Method m = mTagListNotch != null ? mTagListNotch : mTagListMojang;
+            if (m != null) {
+                Object tagList = m.invoke(stack);
+                if (tagList != null) {
+                    if (mCountNotch == null && mCountMojang == null) {
+                        try { mCountNotch = tagList.getClass().getMethod("c"); } catch (Throwable ignored) {}
+                        try { mCountMojang = tagList.getClass().getMethod("tagCount"); } catch (Throwable ignored) {}
+                    }
+                    Method countM = mCountNotch != null ? mCountNotch : mCountMojang;
+                    if (mGetTagNotch == null && mGetTagMojang == null) {
+                        try { mGetTagNotch = tagList.getClass().getMethod("b", int.class); } catch (Throwable ignored) {}
+                        try { mGetTagMojang = tagList.getClass().getMethod("getCompoundTagAt", int.class); } catch (Throwable ignored) {}
+                    }
+                    Method getTagM = mGetTagNotch != null ? mGetTagNotch : mGetTagMojang;
+                    if (countM != null && getTagM != null) {
+                        int count = ((Number) countM.invoke(tagList)).intValue();
+                        for (int i = 0; i < count; i++) {
+                            Object compound = getTagM.invoke(tagList, i);
+                            if (compound != null) {
+                                if (mGetShortNotch == null && mGetShortMojang == null) {
+                                    try { mGetShortNotch = compound.getClass().getMethod("e", String.class); } catch (Throwable ignored) {}
+                                    try { mGetShortMojang = compound.getClass().getMethod("getShort", String.class); } catch (Throwable ignored) {}
+                                }
+                                Method getShortM = mGetShortNotch != null ? mGetShortNotch : mGetShortMojang;
+                                if (getShortM != null) {
+                                    int id = ((Number) getShortM.invoke(compound, "id")).intValue();
+                                    int lvl = ((Number) getShortM.invoke(compound, "lvl")).intValue();
+                                    int prio = ENCH_PRIORITY.containsKey(id) ? ENCH_PRIORITY.get(id) : 10;
+                                    result.add(new EnchantmentData(id, lvl, prio));
+                                }
+                            }
+                        }
+                        readViaNbt = true;
+                    }
+                }
+            }
+        } catch (Throwable ignored) {}
+
+        if (!readViaNbt || result.isEmpty()) {
+            for (Map.Entry<Integer, Integer> entry : ENCH_PRIORITY.entrySet()) {
+                int id = entry.getKey();
+                try {
+                    int lvl = Stacks.enchantLevel(stack, id);
+                    if (lvl > 0) {
+                        result.add(new EnchantmentData(id, lvl, entry.getValue()));
+                    }
+                } catch (Throwable ignored) {}
+            }
+        }
+
+        Collections.sort(result, (a, b) -> Integer.compare(b.priority, a.priority));
+        return result;
+    }
+
+    public static String getEnchantBadges(Object stack) {
+        if (stack == null) return null;
+        int id = System.identityHashCode(stack);
+        String cached = BADGE_CACHE.get(id);
+        if (cached != null) {
+            return cached.isEmpty() ? null : cached;
+        }
+
+        List<EnchantmentData> enchs = getEnchantments(stack);
+        if (enchs.isEmpty()) {
+            if (BADGE_CACHE.size() > 500) BADGE_CACHE.clear();
+            BADGE_CACHE.put(id, "");
+            return null;
+        }
+
+        StringBuilder sb = new StringBuilder();
+        int count = Math.min(2, enchs.size());
+        for (int i = 0; i < count; i++) {
+            EnchantmentData ed = enchs.get(i);
+            String abbr = ENCH_ABBR.get(ed.id);
+            if (abbr == null) {
+                abbr = "E" + ed.id;
+            }
+            String col = ENCH_COLOR.get(ed.id);
+            if (col == null) {
+                col = "§f";
+            }
+            if (sb.length() > 0) {
+                sb.append(" ");
+            }
+            sb.append(col).append(abbr);
+            if (ed.id != 51 && ed.id != 33 && ed.id != 50) {
+                sb.append(ed.level);
+            }
+        }
+        String result = sb.toString();
+        if (BADGE_CACHE.size() > 500) BADGE_CACHE.clear();
+        BADGE_CACHE.put(id, result);
+        return result;
     }
 
     private static List<Object> getItemsToDraw(Object target, Object[] armor, Object heldItem) {
-        List<Object> items = new ArrayList<>();
+        List<Object> items = new ArrayList<>(5);
         if (target == null) {
             // Preview mode: display sample armor & weapon
             if (TargetHealthMod.settings.showArmorDurability) {
@@ -297,7 +524,11 @@ public final class TargetHudRenderer {
 
     public static String stripFormatting(String input) {
         if (input == null) return "Steve";
-        StringBuilder sb = new StringBuilder();
+        if (input.indexOf('§') == -1) {
+            String trimmed = input.trim();
+            return trimmed.isEmpty() ? "Steve" : trimmed;
+        }
+        StringBuilder sb = new StringBuilder(input.length());
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
             if (c == '§' && i + 1 < input.length()) {

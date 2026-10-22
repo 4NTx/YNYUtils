@@ -19,6 +19,8 @@ public final class PvpStatusHud implements HudElement {
     private static final String CONSUMABLES_ENABLED = "Auto Consumíveis: ATIVADO";
     private static final String CONSUMABLES_DISABLED = "Auto Consumíveis: DESATIVADO";
 
+    public static volatile PvpStatusHud instance;
+
     private final BooleanSupplier knockbackNotificationsEnabled;
     private final BooleanSupplier autoArmorNotificationsEnabled;
     private final BooleanSupplier consumablesNotificationsEnabled;
@@ -37,9 +39,19 @@ public final class PvpStatusHud implements HudElement {
 
     public PvpStatusHud(BooleanSupplier knockbackNotificationsEnabled,
             BooleanSupplier autoArmorNotificationsEnabled, BooleanSupplier consumablesNotificationsEnabled) {
+        instance = this;
         this.knockbackNotificationsEnabled = knockbackNotificationsEnabled;
         this.autoArmorNotificationsEnabled = autoArmorNotificationsEnabled;
         this.consumablesNotificationsEnabled = consumablesNotificationsEnabled;
+    }
+
+    public void showReset(boolean jump, boolean enabled) {
+        message = jump ? (enabled ? "Jump Reset: ATIVADO" : "Jump Reset: DESATIVADO")
+                       : (enabled ? "Shift Reset: ATIVADO" : "Shift Reset: DESATIVADO");
+        color = enabled ? 0x55FF55 : 0xFF5555;
+        autoArmorMessage = false;
+        consumablesMessage = false;
+        visibleUntil = System.nanoTime() + DISPLAY_NANOS;
     }
 
     public void showKnockback(boolean enabled) {

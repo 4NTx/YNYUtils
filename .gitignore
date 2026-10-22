@@ -1,3 +1,8 @@
 /build/
 /logs/
+/config/
 *.class
+*.bak
+artifacts/*.bak
+artifacts/*.before-*
+artifacts/git_head.steinmod

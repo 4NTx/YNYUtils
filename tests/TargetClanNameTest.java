@@ -6,7 +6,9 @@ public final class TargetClanNameTest {
         equal("[YnY] Jogador", TargetClanName.format("Jogador", "[YnY] Jogador", "YnY"));
         equal("Jogador", TargetClanName.format("Jogador", null, null));
         equal("Alvo", TargetClanName.format(null, null, null));
-        System.out.println("PASS: clã no nome do Damage Indicator");
+        equal("[x1]  Jogador [x1]", TargetClanName.format("Jogador", "[x1]  Jogador [x1]", "x1"));
+        equal("[x1] [YnY] Jogador [x1]", TargetClanName.format("Jogador", "[x1] [YnY] Jogador [x1]", "YnY"));
+        System.out.println("PASS: clã no nome do Damage Indicator, filtrando [x1]");
     }
 
     private static void equal(String expected, String actual) {

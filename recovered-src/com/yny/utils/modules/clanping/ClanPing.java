@@ -498,7 +498,7 @@ public final class ClanPing {
                      renderWorldLabel(
                         "§c◆ ATACAR ESTE INIMIGO §7• " + targetDisplayName(var3, this.active.targetName) + this.worldMeta(),
                         var3.s,
-                        var3.t + var3.K + 0.65,
+                        var3.t + var3.K + 1.3D,
                         var3.u,
                         var5,
                         var7,

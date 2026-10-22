@@ -48,12 +48,15 @@ public final class AutoArmor {
     private final long[] retryAt = new long[4];
     private final int[] failedAttempts = new int[4];
     private final long[] lastNoChoiceLog = new long[4];
-    private final boolean[] preventiveFailed = new boolean[4];
-    private final ItemStack[] failedWornArmor = new ItemStack[4];
     private long tick;
     private long nextClickAt;
     private Pending pending;
     private String lastPauseReason;
+    private int lastPauseMask;
+
+    public boolean isSwapPending() {
+        return this.pending != null;
+    }
 
     public AutoArmor(BooleanSupplier enabled, IntSupplier preventiveThreshold, IntSupplier preferredMaterial,
             BooleanSupplier ignoreUnenchanted, BooleanSupplier useDamagedReserves,
@@ -72,6 +75,8 @@ public final class AutoArmor {
     /** Chamado no fim do tick; não abre GUI e não altera movimento ou item cursor. */
     public void onTickEnd() {
         tick++;
+        AutoArmorHelper.recoverOrphanedCursor();
+        AutoArmorHelper.checkPreventiveArmorAlert();
         if (pending != null) {
             Minecraft mc = Minecraft.getMinecraft();
             if (mc.currentScreen != null || Inventory.isScreenOpen() || Inventory.isContainerOpen()) {
@@ -91,44 +96,44 @@ public final class AutoArmor {
                 || mc.playerController == null || mc.playerController.isInCreativeMode()
                 || mc.playerController.isSpectator() || mc.currentScreen != null
                 || Inventory.isContainerOpen() || Inventory.windowId() != 0 || Inventory.cursor() != null) {
-            String reason = "pausado: player=" + (mc.thePlayer != null)
-                    + "; world=" + (mc.theWorld != null) + "; alive="
-                    + (mc.thePlayer != null && mc.thePlayer.isEntityAlive()) + "; controller="
-                    + (mc.playerController != null) + "; creative="
-                    + (mc.playerController != null && mc.playerController.isInCreativeMode())
-                    + "; spectator=" + (mc.playerController != null && mc.playerController.isSpectator())
-                    + "; screen=" + (mc.currentScreen == null ? "none" : mc.currentScreen.getClass().getName())
-                    + "; container=" + Inventory.isContainerOpen() + "; window=" + Inventory.windowId()
-                    + "; cursor=" + describe(asStack(Inventory.cursor()));
-            if (!reason.equals(lastPauseReason)) {
+            int pauseMask = (mc.thePlayer == null ? 1 : 0)
+                    | (mc.theWorld == null ? 2 : 0)
+                    | (mc.thePlayer != null && !mc.thePlayer.isEntityAlive() ? 4 : 0)
+                    | (mc.playerController == null ? 8 : 0)
+                    | (mc.playerController != null && mc.playerController.isInCreativeMode() ? 16 : 0)
+                    | (mc.playerController != null && mc.playerController.isSpectator() ? 32 : 0)
+                    | (mc.currentScreen != null ? 64 : 0)
+                    | (Inventory.isContainerOpen() ? 128 : 0)
+                    | (Inventory.windowId() != 0 ? 256 : 0)
+                    | (Inventory.cursor() != null ? 512 : 0);
+            if (pauseMask != lastPauseMask) {
+                lastPauseMask = pauseMask;
+                String reason = "pausado: player=" + (mc.thePlayer != null)
+                        + "; world=" + (mc.theWorld != null) + "; alive="
+                        + (mc.thePlayer != null && mc.thePlayer.isEntityAlive()) + "; controller="
+                        + (mc.playerController != null) + "; creative="
+                        + (mc.playerController != null && mc.playerController.isInCreativeMode())
+                        + "; spectator=" + (mc.playerController != null && mc.playerController.isSpectator())
+                        + "; screen=" + (mc.currentScreen == null ? "none" : mc.currentScreen.getClass().getName())
+                        + "; container=" + Inventory.isContainerOpen() + "; window=" + Inventory.windowId()
+                        + "; cursor=" + describe(asStack(Inventory.cursor()));
                 log("tick=" + tick + " " + reason);
                 lastPauseReason = reason;
             }
             return;
         }
+        lastPauseMask = 0;
         lastPauseReason = null;
+        if (!PriorityBus.canSwapArmor()) {
+            return;
+        }
         if (tick < nextClickAt) {
             return;
         }
 
-        int threshold = Math.max(0, Math.min(50, preventiveThreshold.getAsInt()));
+        int threshold = ArmorThreshold.normalize(preventiveThreshold.getAsInt());
         for (int piece : PRIORITY) {
             ItemStack worn = asStack(Inventory.armor(piece));
-            if (preventiveFailed[piece]) {
-                if (worn == null || isBroken(worn)) {
-                    preventiveFailed[piece] = false;
-                    failedWornArmor[piece] = null;
-                    log(pieceName(piece) + " quebrou após falha preventiva; iniciando reposição urgente");
-                } else if (!matchesArmor(worn, failedWornArmor[piece])) {
-                    // A different piece was equipped manually or by another system.
-                    preventiveFailed[piece] = false;
-                    failedWornArmor[piece] = null;
-                } else {
-                    // Avoid repeating a rejected preventive click. Keep watching this slot;
-                    // as soon as it breaks/disappears, the urgent replacement path below runs.
-                    continue;
-                }
-            }
             // A destroyed item must never be protected by the preventive threshold.
             if (worn != null && !isBroken(worn)
                     && (threshold == 0 || durabilityPercent(worn) > threshold)) {
@@ -163,11 +168,10 @@ public final class AutoArmor {
                 worn, dropUnenchantedOld.getAsBoolean() && worn != null && !worn.isItemEnchanted());
         pending = operation; // arm before windowClick can be observed
         nextClickAt = tick + CLICK_DELAY_TICKS;
-        if (!Inventory.equip(choice.inventoryIndex)) {
+        if (!AutoArmorHelper.performEquip(piece, choice.inventoryIndex, worn)) {
             log("equip() recusou " + pieceName(piece) + " source=" + choice.inventoryIndex
                     + " worn=" + describe(operation.oldArmor) + " reserve=" + describe(choice.stack));
             pending = null;
-            deferPreventiveUntilBroken(operation);
             scheduleRetry(piece);
             status.accept("Auto Armor: troca não iniciada");
         } else {
@@ -277,8 +281,6 @@ public final class AutoArmor {
         for (int i = 0; i < retryAt.length; i++) {
             retryAt[i] = 0L;
             failedAttempts[i] = 0;
-            preventiveFailed[i] = false;
-            failedWornArmor[i] = null;
         }
     }
 
@@ -321,7 +323,9 @@ public final class AutoArmor {
             pending = null;
             return;
         }
-        if (pending.localApplied && pending.serverConfirmed) {
+        if (pending.localApplied && (pending.serverConfirmed
+                || (pending.age >= 2
+                && matchesReplacementArmor(asStack(Inventory.armor(pending.piece)), pending)))) {
             // The server can put the old piece on the cursor after confirming the new one.
             // Never release the operation while that item is still being carried.
             if (pending.age < 3) {
@@ -345,9 +349,8 @@ public final class AutoArmor {
                 return;
             }
             failedAttempts[pending.piece] = 0;
-            preventiveFailed[pending.piece] = false;
-            failedWornArmor[pending.piece] = null;
-            if (pending.dropOld && pending.cursorReturnIndex < 0 && enabled.getAsBoolean()
+            if (pending.serverConfirmed && pending.dropOld && pending.cursorReturnIndex < 0
+                    && enabled.getAsBoolean()
                     && matchesExpected(asStack(Inventory.stack(pending.sourceIndex)), pending.oldArmor)
                     && Inventory.cursor() == null) {
                 pending.dropping = true;
@@ -366,16 +369,19 @@ public final class AutoArmor {
         }
 
         if (pending.age >= SERVER_WAIT_TIMEOUT_TICKS && Inventory.cursor() != null) {
-            if (!pending.cursorTimeoutLogged) {
-                log("FALLBACK BLOQUEADO: cursor não vazio após timeout em " + pieceName(pending.piece)
-                        + "; cursor=" + describe(asStack(Inventory.cursor())) + "; source="
-                        + describe(asStack(Inventory.stack(pending.sourceIndex))) + "; armor="
-                        + describe(asStack(Inventory.armor(pending.piece))) + "; pending="
-                        + pendingSummary(pending));
-                status.accept("Auto Armor: cursor ocupado; troca pausada");
-                pending.cursorTimeoutLogged = true;
+            AutoArmorHelper.recoverOrphanedCursor();
+            if (Inventory.cursor() != null) {
+                if (!pending.cursorTimeoutLogged) {
+                    log("FALLBACK BLOQUEADO: cursor não vazio após timeout em " + pieceName(pending.piece)
+                            + "; cursor=" + describe(asStack(Inventory.cursor())) + "; source="
+                            + describe(asStack(Inventory.stack(pending.sourceIndex))) + "; armor="
+                            + describe(asStack(Inventory.armor(pending.piece))) + "; pending="
+                            + pendingSummary(pending));
+                    status.accept("Auto Armor: cursor ocupado; troca pausada");
+                    pending.cursorTimeoutLogged = true;
+                }
+                return;
             }
-            return;
         }
         if (pending.age >= SERVER_WAIT_TIMEOUT_TICKS) {
             if (pending.localApplied
@@ -394,7 +400,6 @@ public final class AutoArmor {
                         + describe(asStack(Inventory.stack(pending.sourceIndex))) + "; armor="
                         + describe(asStack(Inventory.armor(pending.piece))) + "; cursor="
                         + describe(asStack(Inventory.cursor())));
-                deferPreventiveUntilBroken(pending);
                 scheduleRetry(pending.piece);
                 pending = null;
             }
@@ -540,21 +545,8 @@ public final class AutoArmor {
         }
         log("troca rejeitada/desync " + pieceName(pending.piece) + "; tentativa="
                 + (failedAttempts[pending.piece] + 1));
-        deferPreventiveUntilBroken(pending);
         scheduleRetry(pending.piece);
         pending = null;
-    }
-
-    private void deferPreventiveUntilBroken(Pending operation) {
-        if (!operation.preventive || operation.oldArmor == null) {
-            return;
-        }
-        preventiveFailed[operation.piece] = true;
-        failedWornArmor[operation.piece] = copy(operation.oldArmor);
-        log("fallback ativado para " + pieceName(operation.piece)
-                + ": aguardando a peça quebrar para tentar reposição urgente");
-        status.accept("Auto Armor: " + pieceName(operation.piece)
-                + " será reposta ao quebrar");
     }
 
     private void scheduleRetry(int piece) {
@@ -572,7 +564,8 @@ public final class AutoArmor {
     private Choice bestReplacement(int piece, ItemStack worn, int threshold) {
         Choice best = null;
         Choice preventiveFallback = null;
-        StringBuilder inventoryScan = new StringBuilder();
+        boolean shouldLogScan = (lastNoChoiceLog[piece] == 0L || tick - lastNoChoiceLog[piece] >= 100L);
+        StringBuilder inventoryScan = shouldLogScan ? new StringBuilder() : null;
         int preference = Math.max(0, Math.min(PREFERRED_MATERIALS.length - 1, preferredMaterial.getAsInt()));
         boolean preventive = worn != null && !isBroken(worn)
                 && threshold > 0 && durabilityPercent(worn) <= threshold;
@@ -594,12 +587,14 @@ public final class AutoArmor {
             else if (preventive && durabilityPercent(candidate) > durabilityPercent(worn)
                     && Inventory.armorValue(candidate) < Inventory.armorValue(worn)) rejection = "preventive-fallback-lower-armor";
             else if (preventive) rejection = "preventive-not-durable-enough";
-            if (inventoryScan.length() > 0) inventoryScan.append(" | ");
-            inventoryScan.append("slot=").append(slot).append(':').append(describe(candidate))
-                    .append(" piece=").append(candidatePiece).append(" ench=")
-                    .append(candidate.isItemEnchanted()).append(" armor=")
-                    .append(Inventory.armorValue(candidate)).append(" remaining=")
-                    .append(durabilityPercent(candidate)).append("% reason=").append(rejection);
+            if (inventoryScan != null) {
+                if (inventoryScan.length() > 0) inventoryScan.append(" | ");
+                inventoryScan.append("slot=").append(slot).append(':').append(describe(candidate))
+                        .append(" piece=").append(candidatePiece).append(" ench=")
+                        .append(candidate.isItemEnchanted()).append(" armor=")
+                        .append(Inventory.armorValue(candidate)).append(" remaining=")
+                        .append(durabilityPercent(candidate)).append("% reason=").append(rejection);
+            }
             if (candidatePiece != piece || isBroken(candidate)) {
                 continue;
             }
@@ -626,11 +621,11 @@ public final class AutoArmor {
                 best = choice;
             }
         }
-        if (best != null || preventiveFallback != null || lastNoChoiceLog[piece] == 0L
-                || tick - lastNoChoiceLog[piece] >= 100L) {
+        if (shouldLogScan) {
             log("scan reservas " + pieceName(piece) + "; worn=" + describe(worn) + "; preventive="
-                    + preventive + "; slots=" + (inventoryScan.length() == 0
+                    + preventive + "; slots=" + (inventoryScan == null || inventoryScan.length() == 0
                             ? "nenhuma armadura nos slots 0-35" : inventoryScan.toString()));
+            lastNoChoiceLog[piece] = tick;
         }
         return best != null ? best : preventiveFallback;
     }
@@ -646,7 +641,7 @@ public final class AutoArmor {
             return left.preferred ? 1 : -1;
         }
         int quality = Long.compare(left.score, right.score);
-        return quality != 0 ? quality : Integer.compare(right.inventoryIndex, left.inventoryIndex);
+        return quality != 0 ? quality : AutoArmorHelper.compareSlots(left.inventoryIndex, right.inventoryIndex);
     }
 
     private static long score(ItemStack stack) {
@@ -678,7 +673,7 @@ public final class AutoArmor {
         return ((ItemArmor) stack.getItem()).getArmorMaterial() == PREFERRED_MATERIALS[preference];
     }
 
-    private static boolean isBroken(ItemStack stack) {
+    static boolean isBroken(ItemStack stack) {
         int maxDamage = stack.getMaxDamage();
         return maxDamage > 0 && stack.getItemDamage() >= maxDamage;
     }
@@ -788,7 +783,7 @@ public final class AutoArmor {
         return value instanceof ItemStack ? (ItemStack) value : null;
     }
 
-    private static ItemStack copy(ItemStack stack) {
+    static ItemStack copy(ItemStack stack) {
         return stack == null ? null : stack.copy();
     }
 

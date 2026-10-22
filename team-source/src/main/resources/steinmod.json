@@ -1,0 +1,9 @@
+{
+  "id": "ynyteam",
+  "name": "YNYUtils Equipe",
+  "version": "1.0.0",
+  "author": "4NT",
+  "description": "Allies and enemies you mark (players and clans, or a list from a URL), a sprint toggle key with optional sprint in all directions, and the nearest enemy's distance on the HUD grid.",
+  "entry": "com.yny.utils.team.SteinCombat",
+  "loader": "0.1.25"
+}

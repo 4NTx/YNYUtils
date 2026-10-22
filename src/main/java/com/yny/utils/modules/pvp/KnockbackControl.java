@@ -31,11 +31,11 @@ public final class KnockbackControl {
     private final IntSupplier percent;
     private final BooleanSupplier preserveVertical;
     private final BooleanSupplier jumpResetEnabled;
-    private final BooleanSupplier diagnostics;
+    final BooleanSupplier diagnostics;
     private final KnockbackJumpReset jumpReset;
     private final ArrayBlockingQueue<VelocitySample> samples = new ArrayBlockingQueue<>(128);
     private final AtomicInteger droppedSamples = new AtomicInteger();
-    private final AtomicInteger serverCorrections = new AtomicInteger();
+    final AtomicInteger serverCorrections = new AtomicInteger();
     private DisplacementTrace displacement;
     private volatile int localPlayerId = Integer.MIN_VALUE;
     private volatile Channel installedChannel;
@@ -176,7 +176,7 @@ public final class KnockbackControl {
         jumpReset.onLocalHurt();
     }
 
-    private VelocitySample adjust(S12PacketEntityVelocity packet) {
+    VelocitySample adjust(S12PacketEntityVelocity packet) {
         if (packet.getEntityID() != localPlayerId) {
             return null;
         }
@@ -185,7 +185,7 @@ public final class KnockbackControl {
         int originalZ = packet.motionZ;
         jumpReset.onVelocity(packet.motionX, packet.motionY, packet.motionZ);
         boolean reduce = enabled.getAsBoolean();
-        int value = reduce ? Math.max(93, Math.min(100, percent.getAsInt())) : 100;
+        int value = reduce ? Math.max(8, Math.min(100, percent.getAsInt())) : 100;
         boolean verticalVanilla = preserveVertical.getAsBoolean();
         if (reduce && value != 100) {
             packet.motionX = scale(packet.motionX, value);
@@ -206,7 +206,7 @@ public final class KnockbackControl {
     }
 
     /** Roda após o handler vanilla do S12, sem tocar movimento normal entre hits. */
-    private void afterVelocityHandled(VelocitySample sample, Channel sourceChannel) {
+    void afterVelocityHandled(VelocitySample sample, Channel sourceChannel) {
         Minecraft mc = Minecraft.getMinecraft();
         EntityPlayerSP player = mc.thePlayer;
         if (sourceChannel != installedChannel || player == null || mc.theWorld == null
@@ -245,7 +245,12 @@ public final class KnockbackControl {
     }
 
     static int scale(int motion, int percent) {
-        return Math.round(motion * (percent / 100.0F));
+        if (motion == 0) return 0;
+        int scaled = Math.round(motion * (percent / 100.0F));
+        if (scaled == 0) {
+            return motion > 0 ? 1 : -1;
+        }
+        return scaled;
     }
 
     private static final class VelocitySample {
@@ -255,6 +260,12 @@ public final class KnockbackControl {
         final int appliedX, appliedY, appliedZ;
         final boolean reduce, verticalVanilla, jumpReset;
         final int percent;
+
+        VelocitySample(int entityId, int originalX, int originalY, int originalZ,
+                int appliedX, int appliedY, int appliedZ,
+                boolean reduce, int percent, boolean verticalVanilla) {
+            this(entityId, originalX, originalY, originalZ, appliedX, appliedY, appliedZ, reduce, percent, verticalVanilla, false);
+        }
 
         VelocitySample(int entityId, int originalX, int originalY, int originalZ,
                 int appliedX, int appliedY, int appliedZ,

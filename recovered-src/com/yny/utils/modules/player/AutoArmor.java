@@ -1,942 +1,867 @@
 package com.yny.utils.modules.player;
 
-import com.yny.utils.core.DebugLog;
-import dev.xavier.stein.loader.api.Inventory;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
-import yj.a;
 
+import com.yny.utils.core.DebugLog;
+
+import dev.xavier.stein.loader.api.Inventory;
+import net.minecraft.client.Minecraft;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.item.ItemArmor;
+import net.minecraft.item.ItemArmor.ArmorMaterial;
+import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NBTTagCompound;
+
+/** Reposição de armadura orientada a inventário e confirmada pelo servidor. */
 public final class AutoArmor {
-   private static final int[] PRIORITY = new int[]{2, 1, 3, 0};
-   private static final a[] PREFERRED_MATERIALS = new a[]{null, a.e, a.c, a.b, a.d, a.a};
-   private static final long FIRST_RETRY_TICKS = 1L;
-   private static final long SECOND_RETRY_TICKS = 3L;
-   private static final long LATER_RETRY_TICKS = 10L;
-   private static final long NO_ITEM_RECHECK_TICKS = 4L;
-   private static final long CLICK_DELAY_TICKS = 1L;
-   private static final long SERVER_WAIT_TIMEOUT_TICKS = 8L;
-   private static final int CURSOR_RETURN_TIMEOUT_TICKS = 8;
-   private static final int CURSOR_RETURN_MAX_ATTEMPTS = 3;
-   private static final int CURSOR_NO_SLOT_GRACE_TICKS = 8;
-   private static final int MIN_DISTINGUISHABLE_DAMAGE_GAP = 32;
-   private final BooleanSupplier enabled;
-   private final IntSupplier preventiveThreshold;
-   private final IntSupplier preferredMaterial;
-   private final BooleanSupplier ignoreUnenchanted;
-   private final BooleanSupplier useDamagedReserves;
-   private final BooleanSupplier dropUnenchantedOld;
-   private final BooleanSupplier dropStuckOld;
-   private final Consumer<String> status;
-   private final long[] retryAt = new long[4];
-   private final int[] failedAttempts = new int[4];
-   private final long[] lastNoChoiceLog = new long[4];
-   private final boolean[] preventiveFailed = new boolean[4];
-   private final zx[] failedWornArmor = new zx[4];
-   private long tick;
-   private long nextClickAt;
-   private AutoArmor.Pending pending;
-   private String lastPauseReason;
+    private static final int[] PRIORITY = {
+        Inventory.CHESTPLATE, Inventory.LEGGINGS, Inventory.HELMET, Inventory.BOOTS
+    };
+    private static final ArmorMaterial[] PREFERRED_MATERIALS = {
+        null, ArmorMaterial.DIAMOND, ArmorMaterial.IRON, ArmorMaterial.CHAIN,
+        ArmorMaterial.GOLD, ArmorMaterial.LEATHER
+    };
+    private static final long FIRST_RETRY_TICKS = 1L;
+    private static final long SECOND_RETRY_TICKS = 3L;
+    private static final long LATER_RETRY_TICKS = 10L;
+    private static final long NO_ITEM_RECHECK_TICKS = 4L;
+    private static final long CLICK_DELAY_TICKS = 1L;
+    // Keep only one armor swap in flight until the server has had time to acknowledge both slots.
+    // If a Stein build omits the slot callback, the local prediction gets a bounded fallback below.
+    private static final long SERVER_WAIT_TIMEOUT_TICKS = 16L;
+    private static final int CURSOR_RETURN_TIMEOUT_TICKS = 8;
+    private static final int CURSOR_RETURN_MAX_ATTEMPTS = 3;
+    private static final int CURSOR_NO_SLOT_GRACE_TICKS = 8;
+    private static final int MIN_DISTINGUISHABLE_DAMAGE_GAP = 32;
 
-   public AutoArmor(
-      BooleanSupplier var1,
-      IntSupplier var2,
-      IntSupplier var3,
-      BooleanSupplier var4,
-      BooleanSupplier var5,
-      BooleanSupplier var6,
-      BooleanSupplier var7,
-      Consumer<String> var8
-   ) {
-      this.enabled = var1;
-      this.preventiveThreshold = var2;
-      this.preferredMaterial = var3;
-      this.ignoreUnenchanted = var4;
-      this.useDamagedReserves = var5;
-      this.dropUnenchantedOld = var6;
-      this.dropStuckOld = var7;
-      this.status = var8;
-   }
+    private final BooleanSupplier enabled;
+    private final IntSupplier preventiveThreshold;
+    private final IntSupplier preferredMaterial;
+    private final BooleanSupplier ignoreUnenchanted;
+    private final BooleanSupplier useDamagedReserves;
+    private final BooleanSupplier dropUnenchantedOld;
+    private final BooleanSupplier dropStuckOld;
+    private final Consumer<String> status;
+    private final long[] retryAt = new long[4];
+    private final int[] failedAttempts = new int[4];
+    private final long[] lastNoChoiceLog = new long[4];
+    private long tick;
+    private long nextClickAt;
+    private Pending pending;
+    private String lastPauseReason;
 
-   private static boolean isOwnInventoryScreen(ave var0) {
-      return var0.m instanceof azc && !Inventory.isContainerOpen() && Inventory.windowId() == 0;
-   }
+    public AutoArmor(BooleanSupplier enabled, IntSupplier preventiveThreshold, IntSupplier preferredMaterial,
+            BooleanSupplier ignoreUnenchanted, BooleanSupplier useDamagedReserves,
+            BooleanSupplier dropUnenchantedOld, BooleanSupplier dropStuckOld,
+            Consumer<String> status) {
+        this.enabled = enabled;
+        this.preventiveThreshold = preventiveThreshold;
+        this.preferredMaterial = preferredMaterial;
+        this.ignoreUnenchanted = ignoreUnenchanted;
+        this.useDamagedReserves = useDamagedReserves;
+        this.dropUnenchantedOld = dropUnenchantedOld;
+        this.dropStuckOld = dropStuckOld;
+        this.status = status;
+    }
 
-   private static boolean hasUnsafeInventoryUi(ave var0) {
-      return !isOwnInventoryScreen(var0) && (var0.m != null || Inventory.isScreenOpen() || Inventory.isContainerOpen());
-   }
-
-   public void onTickEnd() {
-      this.tick++;
-      if (this.pending != null) {
-         ave var9 = ave.A();
-         if (hasUnsafeInventoryUi(var9)) {
-            this.pending.manualIntervened = true;
-            this.pending.serverOldCursor = null;
-         }
-
-         this.observeCurrentInventory();
-         this.advancePending();
-      } else if (this.enabled.getAsBoolean()) {
-         ave var1 = ave.A();
-         if (var1.h != null
-            && var1.f != null
-            && var1.h.ai()
-            && var1.c != null
-            && !var1.c.h()
-            && !var1.c.a()
-            && !hasUnsafeInventoryUi(var1)
-            && !Inventory.isContainerOpen()
-            && Inventory.windowId() == 0
-            && Inventory.cursor() == null) {
-            this.lastPauseReason = null;
-            if (this.tick >= this.nextClickAt) {
-               int var10 = Math.max(0, Math.min(50, this.preventiveThreshold.getAsInt()));
-
-               for (int var6 : PRIORITY) {
-                  zx var7 = asStack(Inventory.armor(var6));
-                  if (this.preventiveFailed[var6]) {
-                     if (var7 != null && !isBroken(var7)) {
-                        if (matchesArmor(var7, this.failedWornArmor[var6])) {
-                           continue;
-                        }
-
-                        this.preventiveFailed[var6] = false;
-                        this.failedWornArmor[var6] = null;
-                     } else {
-                        this.preventiveFailed[var6] = false;
-                        this.failedWornArmor[var6] = null;
-                        log(pieceName(var6) + " quebrou após falha preventiva; iniciando reposição urgente");
-                     }
-                  }
-
-                  if ((var7 == null || isBroken(var7) || var10 != 0 && durabilityPercent(var7) <= var10)
-                     && (var7 == null || isBroken(var7) || this.tick >= this.retryAt[var6])) {
-                     AutoArmor.Choice var8 = this.bestReplacement(var6, var7, var10);
-                     if (var8 != null) {
-                        this.beginEquip(var6, var8, var7);
-                        return;
-                     }
-
-                     if (this.lastNoChoiceLog[var6] == 0L || this.tick - this.lastNoChoiceLog[var6] >= 100L) {
-                        log(
-                           "sem reserva elegível para "
-                              + pieceName(var6)
-                              + "; worn="
-                              + describe(var7)
-                              + "; threshold="
-                              + var10
-                              + "%; ignoreUnenchanted="
-                              + this.ignoreUnenchanted.getAsBoolean()
-                              + "; damagedReserves="
-                              + this.useDamagedReserves.getAsBoolean()
-                        );
-                        this.lastNoChoiceLog[var6] = this.tick;
-                     }
-
-                     this.retryAt[var6] = this.tick + 4L;
-                  }
-               }
+    /** Chamado no fim do tick; não abre GUI e não altera movimento ou item cursor. */
+    public void onTickEnd() {
+        tick++;
+        AutoArmorHelper.recoverOrphanedCursor();
+        if (pending != null) {
+            Minecraft mc = Minecraft.getMinecraft();
+            if (mc.currentScreen != null || Inventory.isScreenOpen() || Inventory.isContainerOpen()) {
+                pending.manualIntervened = true;
+                pending.serverOldCursor = null;
             }
-         } else {
-            String var2 = "pausado: player="
-               + (var1.h != null)
-               + "; world="
-               + (var1.f != null)
-               + "; alive="
-               + (var1.h != null && var1.h.ai())
-               + "; controller="
-               + (var1.c != null)
-               + "; creative="
-               + (var1.c != null && var1.c.h())
-               + "; spectator="
-               + (var1.c != null && var1.c.a())
-               + "; screen="
-               + (var1.m == null ? "none" : var1.m.getClass().getName())
-               + "; container="
-               + Inventory.isContainerOpen()
-               + "; window="
-               + Inventory.windowId()
-               + "; cursor="
-               + describe(asStack(Inventory.cursor()));
-            if (!var2.equals(this.lastPauseReason)) {
-               log("tick=" + this.tick + " " + var2);
-               this.lastPauseReason = var2;
+            observeCurrentInventory();
+            advancePending();
+            return;
+        }
+        if (!enabled.getAsBoolean()) {
+            return;
+        }
+
+        Minecraft mc = Minecraft.getMinecraft();
+        if (mc.thePlayer == null || mc.theWorld == null || !mc.thePlayer.isEntityAlive()
+                || mc.playerController == null || mc.playerController.isInCreativeMode()
+                || mc.playerController.isSpectator() || mc.currentScreen != null
+                || Inventory.isContainerOpen() || Inventory.windowId() != 0 || Inventory.cursor() != null) {
+            String reason = "pausado: player=" + (mc.thePlayer != null)
+                    + "; world=" + (mc.theWorld != null) + "; alive="
+                    + (mc.thePlayer != null && mc.thePlayer.isEntityAlive()) + "; controller="
+                    + (mc.playerController != null) + "; creative="
+                    + (mc.playerController != null && mc.playerController.isInCreativeMode())
+                    + "; spectator=" + (mc.playerController != null && mc.playerController.isSpectator())
+                    + "; screen=" + (mc.currentScreen == null ? "none" : mc.currentScreen.getClass().getName())
+                    + "; container=" + Inventory.isContainerOpen() + "; window=" + Inventory.windowId()
+                    + "; cursor=" + describe(asStack(Inventory.cursor()));
+            if (!reason.equals(lastPauseReason)) {
+                log("tick=" + tick + " " + reason);
+                lastPauseReason = reason;
             }
-         }
-      }
-   }
+            return;
+        }
+        lastPauseReason = null;
+        if (tick < nextClickAt) {
+            return;
+        }
 
-   private void beginEquip(int var1, AutoArmor.Choice var2, zx var3) {
-      if (this.tick < this.retryAt[var1]) return;
-      AutoArmor.Pending var4 = new AutoArmor.Pending(
-         var1, var2.inventoryIndex, var2.stack, var3, this.dropUnenchantedOld.getAsBoolean() && var3 != null && !var3.w()
-      );
-      this.pending = var4;
-      this.nextClickAt = this.tick + 1L;
-      if (!Inventory.equip(var2.inventoryIndex)) {
-         log("equip() recusou " + pieceName(var1) + " source=" + var2.inventoryIndex + " worn=" + describe(var4.oldArmor) + " reserve=" + describe(var2.stack));
-         this.pending = null;
-         this.deferPreventiveUntilBroken(var4);
-         this.scheduleRetry(var1);
-         this.status.accept("Auto Armor: troca não iniciada");
-      } else {
-         log(
-            "iniciada "
-               + pieceName(var1)
-               + " source="
-               + var2.inventoryIndex
-               + " mode="
-               + (var3 != null && !isBroken(var3) ? "preventiva" : "reposicao urgente")
-               + " worn="
-               + describe(var4.oldArmor)
-               + " reserve="
-               + describe(var2.stack)
-         );
-         this.observeCurrentInventory();
-      }
-   }
-
-   public void onSlotChanged(int var1, int var2, Object var3) {
-      if (this.pending != null) {
-         zx var4 = asStack(var3);
-         if (var1 == -1 && var2 == -1) {
-            if (var4 != null
-               && this.pending.serverOldCursor == null
-               && !this.pending.manualIntervened
-               && this.pending.oldArmor != null
-               && this.pending.localApplied
-               && matchesOldIdentityAndDamage(var4, this.pending)) {
-               this.pending.serverOldCursor = copy(var4);
-               log("cursor do servidor identificado como peça antiga: " + describe(var4));
+        int threshold = ArmorThreshold.normalize(preventiveThreshold.getAsInt());
+        for (int piece : PRIORITY) {
+            ItemStack worn = asStack(Inventory.armor(piece));
+            // A destroyed item must never be protected by the preventive threshold.
+            if (worn != null && !isBroken(worn)
+                    && (threshold == 0 || durabilityPercent(worn) > threshold)) {
+                continue;
+            }
+            // Retry backoff applies only to preventive attempts. A broken/missing piece is
+            // urgent and must be replaced immediately, even after several failed swaps.
+            if (worn != null && !isBroken(worn) && tick < retryAt[piece]) {
+                continue;
             }
 
-            if ((this.pending.cursorReturnIndex >= 0 || this.pending.cursorDropIssued) && var4 == null) {
-               this.pending.cursorClearSeen = true;
+            Choice replacement = bestReplacement(piece, worn, threshold);
+            if (replacement == null) {
+                if (lastNoChoiceLog[piece] == 0L || tick - lastNoChoiceLog[piece] >= 100L) {
+                    log("sem reserva elegível para " + pieceName(piece) + "; worn=" + describe(worn)
+                            + "; threshold=" + threshold + "%; ignoreUnenchanted="
+                            + ignoreUnenchanted.getAsBoolean() + "; damagedReserves="
+                            + useDamagedReserves.getAsBoolean());
+                    lastNoChoiceLog[piece] = tick;
+                }
+                retryAt[piece] = tick + NO_ITEM_RECHECK_TICKS;
+                continue;
             }
 
-            if (this.pending.rejected && var4 == null) {
-               this.finishRejected();
+            beginEquip(piece, replacement, worn);
+            return;
+        }
+    }
+
+    private void beginEquip(int piece, Choice choice, ItemStack worn) {
+        Pending operation = new Pending(piece, choice.inventoryIndex, choice.stack,
+                worn, dropUnenchantedOld.getAsBoolean() && worn != null && !worn.isItemEnchanted());
+        pending = operation; // arm before windowClick can be observed
+        nextClickAt = tick + CLICK_DELAY_TICKS;
+        if (!AutoArmorHelper.performEquip(piece, choice.inventoryIndex, worn)) {
+            log("equip() recusou " + pieceName(piece) + " source=" + choice.inventoryIndex
+                    + " worn=" + describe(operation.oldArmor) + " reserve=" + describe(choice.stack));
+            pending = null;
+            scheduleRetry(piece);
+            status.accept("Auto Armor: troca não iniciada");
+        } else {
+            log("iniciada " + pieceName(piece) + " source=" + choice.inventoryIndex
+                    + " mode=" + (worn == null || isBroken(worn) ? "reposicao urgente" : "preventiva")
+                    + " worn=" + describe(operation.oldArmor) + " reserve=" + describe(choice.stack));
+            // windowClick updates the client prediction synchronously. Do not treat that as a
+            // server confirmation or start another piece in the same tick.
+            observeCurrentInventory();
+        }
+    }
+
+    /** Stein chama este callback depois de aplicar a atualização vinda do servidor. */
+    public void onSlotChanged(int windowId, int slot, Object value) {
+        if (pending == null) {
+            return;
+        }
+        ItemStack stack = asStack(value);
+        if (windowId == -1 && slot == -1) {
+            if (stack != null && pending.serverOldCursor == null && !pending.manualIntervened
+                    && pending.oldArmor != null && pending.localApplied
+                    && matchesOldIdentityAndDamage(stack, pending)) {
+                pending.serverOldCursor = copy(stack);
+                log("cursor do servidor identificado como peça antiga: " + describe(stack));
             }
-         } else if (var1 == 0) {
-            int var5 = Inventory.inventoryIndexOf(var2);
-            if (var5 == this.pending.sourceIndex || var5 == 36 + this.pending.piece || var5 == this.pending.cursorReturnIndex) {
-               if (var5 == this.pending.cursorReturnIndex && matchesOldOrObservedCursor(var4, this.pending)) {
-                  this.pending.cursorReturnSlotSeen = true;
-               }
-
-               if (this.pending.dropping) {
-                  if (var5 == this.pending.sourceIndex && var4 == null) {
-                     this.pending.serverConfirmed = true;
-                  }
-               } else {
-                  if (var5 == this.pending.sourceIndex) {
-                     this.pending.sourceSeen = true;
-                     this.pending.source = copy(var4);
-                  }
-
-                  if (var5 == 36 + this.pending.piece) {
-                     this.pending.armorSeen = true;
-                     this.pending.armor = copy(var4);
-                  }
-
-                  this.confirmIfAuthoritative();
-               }
+            if ((pending.cursorReturnIndex >= 0 || pending.cursorDropIssued) && stack == null) {
+                pending.cursorClearSeen = true;
             }
-         }
-      }
-   }
+            if (pending.rejected && stack == null) {
+                finishRejected();
+            }
+            return;
+        }
+        if (windowId != 0) {
+            return;
+        }
 
-   public void onWindowItems(int var1) {
-      if (this.pending != null && var1 == 0) {
-         if (this.pending.cursorReturnIndex >= 0) {
-            this.pending.cursorClearSeen = Inventory.cursor() == null;
-            this.pending.cursorReturnSlotSeen = matchesOldOrObservedCursor(asStack(Inventory.stack(this.pending.cursorReturnIndex)), this.pending);
-         }
+        int inventoryIndex = Inventory.inventoryIndexOf(slot);
+        if (inventoryIndex != pending.sourceIndex
+                && inventoryIndex != Inventory.ARMOR_START + pending.piece
+                && inventoryIndex != pending.cursorReturnIndex) {
+            return;
+        }
+        if (inventoryIndex == pending.cursorReturnIndex && matchesOldOrObservedCursor(stack, pending)) {
+            pending.cursorReturnSlotSeen = true;
+        }
+        if (pending.dropping) {
+            if (inventoryIndex == pending.sourceIndex && stack == null) {
+                pending.serverConfirmed = true;
+            }
+            return;
+        }
+        if (inventoryIndex == pending.sourceIndex) {
+            pending.sourceSeen = true;
+            pending.source = copy(stack);
+        }
+        if (inventoryIndex == Inventory.ARMOR_START + pending.piece) {
+            pending.armorSeen = true;
+            pending.armor = copy(stack);
+        }
+        confirmIfAuthoritative();
+    }
 
-         if (this.pending.dropping) {
-            if (Inventory.stack(this.pending.sourceIndex) == null) {
-               this.pending.serverConfirmed = true;
+    /** Um snapshot completo permite confirmar ou reconhecer a rejeição/desync. */
+    public void onWindowItems(int windowId) {
+        if (pending == null || windowId != 0) {
+            return;
+        }
+        if (pending.cursorReturnIndex >= 0) {
+            pending.cursorClearSeen = Inventory.cursor() == null;
+            pending.cursorReturnSlotSeen = matchesOldOrObservedCursor(
+                    asStack(Inventory.stack(pending.cursorReturnIndex)), pending);
+        }
+        if (pending.dropping) {
+            if (Inventory.stack(pending.sourceIndex) == null) {
+                pending.serverConfirmed = true;
             } else {
-               this.pending.rejected = true;
+                pending.rejected = true;
             }
-         } else {
-            this.pending.sourceSeen = true;
-            this.pending.source = copy(asStack(Inventory.stack(this.pending.sourceIndex)));
-            this.pending.armorSeen = true;
-            this.pending.armor = copy(asStack(Inventory.armor(this.pending.piece)));
-            if (matchesEquipState(this.pending.source, this.pending.armor, this.pending) && Inventory.cursor() == null) {
-               boolean var2 = !this.pending.serverConfirmed;
-               this.pending.serverConfirmed = true;
-               this.pending.localApplied = true;
-               if (var2) {
-                  logConfirmation("snapshot", this.pending);
-               }
+            return;
+        }
+        pending.sourceSeen = true;
+        pending.source = copy(asStack(Inventory.stack(pending.sourceIndex)));
+        pending.armorSeen = true;
+        pending.armor = copy(asStack(Inventory.armor(pending.piece)));
+        if (matchesEquipState(pending.source, pending.armor, pending)
+                && Inventory.cursor() == null) {
+            boolean firstConfirmation = !pending.serverConfirmed;
+            pending.serverConfirmed = true;
+            pending.localApplied = true;
+            if (firstConfirmation) {
+                logConfirmation("snapshot", pending);
             }
-         }
-      }
-   }
+        } else {
+            // A full-window snapshot can arrive while the server is still processing the
+            // equip click (or while a worn piece breaks). Do not abort the pending swap on
+            // this transient state; let slot callbacks or the bounded timeout decide it.
+            // Aguarda callbacks dos slots ou o timeout limitado; snapshot parcial é comum.
+        }
+    }
 
-   public void resetSession() {
-      this.pending = null;
-      this.nextClickAt = 0L;
-      this.lastPauseReason = null;
+    /** Limpa uma operação interrompida pela troca de mundo/servidor. */
+    public void resetSession() {
+        pending = null;
+        nextClickAt = 0L;
+        lastPauseReason = null;
+        for (int i = 0; i < retryAt.length; i++) {
+            retryAt[i] = 0L;
+            failedAttempts[i] = 0;
+        }
+    }
 
-      for (int var1 = 0; var1 < this.retryAt.length; var1++) {
-         this.retryAt[var1] = 0L;
-         this.failedAttempts[var1] = 0;
-         this.preventiveFailed[var1] = false;
-         this.failedWornArmor[var1] = null;
-      }
-   }
+    /** Poll local slots as well as callbacks; some Stein builds omit a callback on a normal click. */
+    private void observeCurrentInventory() {
+        if (pending.dropping) {
+            return;
+        }
+        ItemStack source = asStack(Inventory.stack(pending.sourceIndex));
+        ItemStack armor = asStack(Inventory.armor(pending.piece));
+        boolean coherent = matchesEquipState(source, armor, pending);
+        if (Inventory.cursor() == null && coherent) {
+            pending.localApplied = true;
+        }
+    }
 
-   private void observeCurrentInventory() {
-      if (!this.pending.dropping) {
-         zx var1 = asStack(Inventory.stack(this.pending.sourceIndex));
-         zx var2 = asStack(Inventory.armor(this.pending.piece));
-         boolean var3 = matchesEquipState(var1, var2, this.pending);
-         if (Inventory.cursor() == null && var3) {
-            this.pending.localApplied = true;
-         }
-      }
-   }
+    private void confirmIfAuthoritative() {
+        if (pending.serverConfirmed) {
+            return;
+        }
+        if (pending.sourceSeen && pending.armorSeen
+                && matchesEquipState(pending.source, pending.armor, pending)) {
+            // Source + armor slot updates are emitted after the server accepted all clicks.
+            pending.serverConfirmed = true;
+            pending.localApplied = true;
+            logConfirmation("slots", pending);
+        }
+    }
 
-   private void confirmIfAuthoritative() {
-      if (!this.pending.serverConfirmed) {
-         if (this.pending.sourceSeen && this.pending.armorSeen && matchesEquipState(this.pending.source, this.pending.armor, this.pending)) {
-            this.pending.serverConfirmed = true;
-            this.pending.localApplied = true;
-            logConfirmation("slots", this.pending);
-         }
-      }
-   }
-
-   private void advancePending() {
-      this.pending.age++;
-      if (this.pending.rejected) {
-         if (Inventory.cursor() == null) {
-            this.finishRejected();
-         }
-      } else if (this.pending.dropping && this.pending.serverConfirmed) {
-         this.status.accept("Auto Armor: peça antiga descartada");
-         this.pending = null;
-      } else if (!this.pending.localApplied || !this.pending.serverConfirmed) {
-         if (this.pending.age >= 16L && Inventory.cursor() != null && this.pending.oldArmor != null) {
-            if (!this.pending.cursorTimeoutLogged) {
-               log(
-                  "FALLBACK BLOQUEADO: cursor não vazio após timeout em "
-                     + pieceName(this.pending.piece)
-                     + "; cursor="
-                     + describe(asStack(Inventory.cursor()))
-                     + "; source="
-                     + describe(asStack(Inventory.stack(this.pending.sourceIndex)))
-                     + "; armor="
-                     + describe(asStack(Inventory.armor(this.pending.piece)))
-                     + "; pending="
-                     + pendingSummary(this.pending)
-               );
-               this.status.accept("Auto Armor: cursor ocupado; troca pausada");
-               this.pending.cursorTimeoutLogged = true;
+    private void advancePending() {
+        pending.age++;
+        if (pending.rejected) {
+            if (Inventory.cursor() == null) {
+                finishRejected();
             }
-         } else {
-            if (this.pending.age >= 16L) {
-               if (this.pending.localApplied
-                  && matchesEquipState(asStack(Inventory.stack(this.pending.sourceIndex)), asStack(Inventory.armor(this.pending.piece)), this.pending)) {
-                  this.failedAttempts[this.pending.piece] = 0;
-                  this.status.accept("Auto Armor: peça equipada; confirmação atrasada");
-                  log(
-                     "fallback local após timeout "
-                        + pieceName(this.pending.piece)
-                        + "; source="
-                        + describe(asStack(Inventory.stack(this.pending.sourceIndex)))
-                        + "; armor="
-                        + describe(asStack(Inventory.armor(this.pending.piece)))
-                  );
-                  this.pending = null;
-               } else {
-                  log(
-                     "timeout sem troca coerente "
-                        + pieceName(this.pending.piece)
-                        + "; source="
-                        + describe(asStack(Inventory.stack(this.pending.sourceIndex)))
-                        + "; armor="
-                        + describe(asStack(Inventory.armor(this.pending.piece)))
-                        + "; cursor="
-                        + describe(asStack(Inventory.cursor()))
-                  );
-                  this.deferPreventiveUntilBroken(this.pending);
-                  this.scheduleRetry(this.pending.piece);
-                  this.pending = null;
-               }
+            return;
+        }
+        if (pending.dropping && pending.serverConfirmed) {
+            status.accept("Auto Armor: peça antiga descartada");
+            pending = null;
+            return;
+        }
+        if (pending.localApplied && (pending.serverConfirmed
+                || (pending.age >= 2
+                && matchesReplacementArmor(asStack(Inventory.armor(pending.piece)), pending)))) {
+            // The server can put the old piece on the cursor after confirming the new one.
+            // Never release the operation while that item is still being carried.
+            if (pending.age < 3) {
+                return;
             }
-         }
-      } else if (this.pending.age >= 1) {
-         ArmorSwapSafety.Outcome var1 = this.settleOldArmorCursor();
-         if (var1 != ArmorSwapSafety.Outcome.WAIT) {
-            if (var1 != ArmorSwapSafety.Outcome.ARMOR_CHANGED && var1 != ArmorSwapSafety.Outcome.DESTINATION_UNKNOWN) {
-               this.failedAttempts[this.pending.piece] = 0;
-               this.preventiveFailed[this.pending.piece] = false;
-               this.failedWornArmor[this.pending.piece] = null;
-               if (this.pending.dropOld
-                  && this.pending.cursorReturnIndex < 0
-                  && this.enabled.getAsBoolean()
-                  && matchesExpected(asStack(Inventory.stack(this.pending.sourceIndex)), this.pending.oldArmor)
-                  && Inventory.cursor() == null) {
-                  this.pending.dropping = true;
-                  this.pending.serverConfirmed = false;
-                  this.pending.sourceSeen = false;
-                  if (Inventory.drop(this.pending.sourceIndex, true)) {
-                     return;
-                  }
+            ArmorSwapSafety.Outcome outcome = settleOldArmorCursor();
+            if (outcome == ArmorSwapSafety.Outcome.WAIT) {
+                return;
+            }
+            if (outcome == ArmorSwapSafety.Outcome.ARMOR_CHANGED
+                    || outcome == ArmorSwapSafety.Outcome.DESTINATION_UNKNOWN) {
+                log("troca com resultado incerto em " + pieceName(pending.piece)
+                        + "; outcome=" + outcome + "; cursor="
+                        + describe(asStack(Inventory.cursor())) + "; destino="
+                        + (pending.cursorReturnIndex < 0 ? "n/a"
+                                : describe(asStack(Inventory.stack(pending.cursorReturnIndex))))
+                        + "; armor=" + describe(asStack(Inventory.armor(pending.piece))));
+                status.accept("Auto Armor: verificando " + pieceName(pending.piece) + " novamente");
+                nextClickAt = tick + CLICK_DELAY_TICKS;
+                pending = null;
+                return;
+            }
+            failedAttempts[pending.piece] = 0;
+            if (pending.serverConfirmed && pending.dropOld && pending.cursorReturnIndex < 0
+                    && enabled.getAsBoolean()
+                    && matchesExpected(asStack(Inventory.stack(pending.sourceIndex)), pending.oldArmor)
+                    && Inventory.cursor() == null) {
+                pending.dropping = true;
+                pending.serverConfirmed = false;
+                pending.sourceSeen = false;
+                if (Inventory.drop(pending.sourceIndex, true)) {
+                    return;
+                }
+                pending.dropping = false;
+            }
+            status.accept("Auto Armor: " + pieceName(pending.piece) + " equipada");
+            log("concluída " + pieceName(pending.piece) + "; armor="
+                    + describe(asStack(Inventory.armor(pending.piece))));
+            pending = null;
+            return;
+        }
 
-                  this.pending.dropping = false;
-               }
-
-               this.status.accept("Auto Armor: " + pieceName(this.pending.piece) + " equipada");
-               log("concluída " + pieceName(this.pending.piece) + "; armor=" + describe(asStack(Inventory.armor(this.pending.piece))));
-               this.pending = null;
+        if (pending.age >= SERVER_WAIT_TIMEOUT_TICKS && Inventory.cursor() != null) {
+            AutoArmorHelper.recoverOrphanedCursor();
+            if (Inventory.cursor() != null) {
+                if (!pending.cursorTimeoutLogged) {
+                    log("FALLBACK BLOQUEADO: cursor não vazio após timeout em " + pieceName(pending.piece)
+                            + "; cursor=" + describe(asStack(Inventory.cursor())) + "; source="
+                            + describe(asStack(Inventory.stack(pending.sourceIndex))) + "; armor="
+                            + describe(asStack(Inventory.armor(pending.piece))) + "; pending="
+                            + pendingSummary(pending));
+                    status.accept("Auto Armor: cursor ocupado; troca pausada");
+                    pending.cursorTimeoutLogged = true;
+                }
+                return;
+            }
+        }
+        if (pending.age >= SERVER_WAIT_TIMEOUT_TICKS) {
+            if (pending.localApplied
+                    && matchesEquipState(asStack(Inventory.stack(pending.sourceIndex)),
+                            asStack(Inventory.armor(pending.piece)), pending)) {
+                // The SDK's local inventory is still coherent, but no authoritative callback arrived.
+                // Keep the equipped piece and never risk an automatic drop on an unconfirmed swap.
+                failedAttempts[pending.piece] = 0;
+                status.accept("Auto Armor: peça equipada; confirmação atrasada");
+                log("fallback local após timeout " + pieceName(pending.piece) + "; source="
+                        + describe(asStack(Inventory.stack(pending.sourceIndex))) + "; armor="
+                        + describe(asStack(Inventory.armor(pending.piece))));
+                pending = null;
             } else {
-               log(
-                  "troca com resultado incerto em "
-                     + pieceName(this.pending.piece)
-                     + "; outcome="
-                     + var1
-                     + "; cursor="
-                     + describe(asStack(Inventory.cursor()))
-                     + "; destino="
-                     + (this.pending.cursorReturnIndex < 0 ? "n/a" : describe(asStack(Inventory.stack(this.pending.cursorReturnIndex))))
-                     + "; armor="
-                     + describe(asStack(Inventory.armor(this.pending.piece)))
-               );
-               this.status.accept("Auto Armor: verificando " + pieceName(this.pending.piece) + " novamente");
-               this.nextClickAt = this.tick + 1L;
-               this.pending = null;
+                log("timeout sem troca coerente " + pieceName(pending.piece) + "; source="
+                        + describe(asStack(Inventory.stack(pending.sourceIndex))) + "; armor="
+                        + describe(asStack(Inventory.armor(pending.piece))) + "; cursor="
+                        + describe(asStack(Inventory.cursor())));
+                scheduleRetry(pending.piece);
+                pending = null;
             }
-         }
-      }
-   }
+        }
+    }
 
-   private ArmorSwapSafety.Outcome settleOldArmorCursor() {
-      ave var1 = ave.A();
-      boolean var2 = ArmorSwapSafety.mayReturnCursor(
-         var1.h != null && var1.h.ai(), hasUnsafeInventoryUi(var1), Inventory.isContainerOpen(), Inventory.windowId()
-      );
-      if (!var2) {
-         if (hasUnsafeInventoryUi(var1)) {
-            this.pending.manualIntervened = true;
-            this.pending.serverOldCursor = null;
-         }
-
-         if (!this.pending.manualPauseLogged) {
-            log(
-               "recuperação pausada para intervenção do jogador: "
-                  + pieceName(this.pending.piece)
-                  + "; screen="
-                  + (var1.m == null ? "none" : var1.m.getClass().getName())
-                  + "; window="
-                  + Inventory.windowId()
-            );
-            this.pending.manualPauseLogged = true;
-         }
-
-         return ArmorSwapSafety.Outcome.WAIT;
-      } else {
-         this.pending.manualPauseLogged = false;
-         zx var3 = asStack(Inventory.cursor());
-         if (!this.pending.cursorDropIssued) {
-            if (var3 != null) {
-               if (!matchesOldOrObservedCursor(var3, this.pending)) {
-                  if (!this.pending.cursorRecoveryWarned) {
-                     log(
-                        "cursor ocupado por outro item durante "
-                           + pieceName(this.pending.piece)
-                           + "; item="
-                           + describe(var3)
-                           + "; antigo="
-                           + describe(this.pending.oldArmor)
-                     );
-                     this.status.accept("Auto Armor: cursor ocupado; troca pausada");
-                     this.pending.cursorRecoveryWarned = true;
-                  }
-
-                  return ArmorSwapSafety.Outcome.WAIT;
-               } else {
-                  if (this.pending.cursorReturnIndex >= 0 && ++this.pending.cursorRecoveryAge < 8) {
-                     return ArmorSwapSafety.Outcome.WAIT;
-                  }
-
-                  if (this.pending.cursorReturnAttempts >= 3) {
-                     if (this.dropStuckCursor(var3, true)) {
-                        return ArmorSwapSafety.Outcome.WAIT;
-                     }
-
-                     if (!this.pending.cursorRecoveryWarned) {
-                        log("devolução da peça antiga não confirmada após 3 tentativas; cursor=" + describe(var3));
-                        this.status.accept("Auto Armor: peça no cursor; resolva no inventário");
-                        this.pending.cursorRecoveryWarned = true;
-                     }
-
-                     return ArmorSwapSafety.Outcome.WAIT;
-                  } else {
-                     int var6 = Inventory.stack(this.pending.sourceIndex) == null ? this.pending.sourceIndex : Inventory.firstEmpty();
-                     int var5 = var6 < 0 ? -1 : Inventory.slotOf(var6);
-                     if (var5 >= 0 && Inventory.stack(var6) == null && Inventory.accepts(var5, var3)) {
-                        this.pending.cursorNoSlotAge = 0;
-                        this.pending.cursorReturnIndex = var6;
-                        this.pending.cursorRecoveryAge = 0;
-                        this.pending.cursorReturnAttempts++;
-                        this.pending.cursorClearSeen = false;
-                        this.pending.cursorReturnSlotSeen = false;
-                        log("devolvendo peça antiga do cursor: " + pieceName(this.pending.piece) + " -> inventário " + var6 + "; item=" + describe(var3));
-                        if (!Inventory.pickup(var5)) {
-                           this.pending.cursorReturnIndex = -1;
-                           log("clique de devolução recusado para " + pieceName(this.pending.piece));
-                        }
-
-                        return ArmorSwapSafety.Outcome.WAIT;
-                     } else {
-                        if (++this.pending.cursorNoSlotAge >= 8 && this.dropStuckCursor(var3, false)) {
-                           return ArmorSwapSafety.Outcome.WAIT;
-                        }
-
-                        if (!this.pending.cursorRecoveryWarned) {
-                           log(
-                              "sem slot seguro para devolver peça antiga de "
-                                 + pieceName(this.pending.piece)
-                                 + "; cursor="
-                                 + describe(var3)
-                                 + "; source="
-                                 + describe(asStack(Inventory.stack(this.pending.sourceIndex)))
-                           );
-                           this.status.accept("Auto Armor: peça antiga no cursor; inventário cheio");
-                           this.pending.cursorRecoveryWarned = true;
-                        }
-
-                        return ArmorSwapSafety.Outcome.WAIT;
-                     }
-                  }
-               }
-            } else if (this.pending.cursorReturnIndex >= 0) {
-               ArmorSwapSafety.Outcome var4 = ArmorSwapSafety.returned(
-                  true,
-                  matchesReplacementArmor(asStack(Inventory.armor(this.pending.piece)), this.pending),
-                  matchesOldOrObservedCursor(asStack(Inventory.stack(this.pending.cursorReturnIndex)), this.pending),
-                  this.pending.cursorClearSeen,
-                  this.pending.cursorReturnSlotSeen,
-                  ++this.pending.cursorRecoveryAge,
-                  8
-               );
-               if (var4 != ArmorSwapSafety.Outcome.WAIT) {
-                  log(
-                     "devolução "
-                        + var4
-                        + ": "
-                        + pieceName(this.pending.piece)
-                        + "; destino="
-                        + describe(asStack(Inventory.stack(this.pending.cursorReturnIndex)))
-                        + "; armor="
-                        + describe(asStack(Inventory.armor(this.pending.piece)))
-                  );
-               }
-
-               return var4;
-            } else {
-               return matchesReplacementArmor(asStack(Inventory.armor(this.pending.piece)), this.pending)
-                  ? ArmorSwapSafety.Outcome.CONFIRMED
-                  : ArmorSwapSafety.Outcome.ARMOR_CHANGED;
+    private ArmorSwapSafety.Outcome settleOldArmorCursor() {
+        Minecraft mc = Minecraft.getMinecraft();
+        boolean mayAct = ArmorSwapSafety.mayReturnCursor(mc.thePlayer != null
+                        && mc.thePlayer.isEntityAlive(), mc.currentScreen != null
+                        || Inventory.isScreenOpen(), Inventory.isContainerOpen(), Inventory.windowId());
+        if (!mayAct) {
+            if (mc.currentScreen != null || Inventory.isScreenOpen() || Inventory.isContainerOpen()) {
+                pending.manualIntervened = true;
+                pending.serverOldCursor = null;
             }
-         } else if (var3 != null || !this.pending.cursorClearSeen && ++this.pending.cursorDropAge < 8) {
-            if (var3 != null && ++this.pending.cursorDropAge == 8) {
-               log("descarte do cursor não confirmado; peça ainda no cursor: " + describe(var3));
-               this.status.accept("Auto Armor: cursor ainda ocupado; intervenção manual necessária");
+            if (!pending.manualPauseLogged) {
+                log("recuperação pausada para intervenção do jogador: " + pieceName(pending.piece)
+                        + "; screen=" + (mc.currentScreen == null ? "none"
+                                : mc.currentScreen.getClass().getName())
+                        + "; window=" + Inventory.windowId());
+                pending.manualPauseLogged = true;
             }
-
             return ArmorSwapSafety.Outcome.WAIT;
-         } else {
-            log("descarte do cursor concluído: " + pieceName(this.pending.piece) + "; confirmação servidor=" + this.pending.cursorClearSeen);
-            return matchesReplacementArmor(asStack(Inventory.armor(this.pending.piece)), this.pending)
-               ? ArmorSwapSafety.Outcome.CONFIRMED
-               : ArmorSwapSafety.Outcome.ARMOR_CHANGED;
-         }
-      }
-   }
-
-   private boolean dropStuckCursor(zx var1, boolean var2) {
-      boolean var3 = this.pending.serverOldCursor != null && matchesObservedCursor(var1, this.pending.serverOldCursor);
-      boolean var4 = ArmorSwapSafety.mayDropStuckOld(
-         this.dropStuckOld.getAsBoolean(),
-         this.pending.manualIntervened,
-         var3,
-         this.pending.serverConfirmed,
-         matchesReplacementArmor(asStack(Inventory.armor(this.pending.piece)), this.pending),
-         var2,
-         this.pending.cursorNoSlotAge,
-         8
-      );
-      if (!var4) {
-         return false;
-      }
-
-      this.pending.cursorDropIssued = true;
-      this.pending.cursorDropAge = 0;
-      this.pending.cursorClearSeen = false;
-      log(
-         "ÚLTIMO RECURSO: descartando peça antiga presa no cursor: "
-            + describe(var1)
-            + "; tentativas de devolução="
-            + this.pending.cursorReturnAttempts
-            + "; sem slot ticks="
-            + this.pending.cursorNoSlotAge
-      );
-      this.status.accept("Auto Armor: peça antiga presa descartada");
-      if (Inventory.dropCursor()) {
-         return true;
-      }
-
-      log("descarte do cursor recusado pelo SDK; peça preservada no cursor");
-      this.status.accept("Auto Armor: não foi possível liberar o cursor");
-      return false;
-   }
-
-   private void finishRejected() {
-      if (this.pending != null) {
-         log("troca rejeitada/desync " + pieceName(this.pending.piece) + "; tentativa=" + (this.failedAttempts[this.pending.piece] + 1));
-         this.deferPreventiveUntilBroken(this.pending);
-         this.scheduleRetry(this.pending.piece);
-         this.pending = null;
-      }
-   }
-
-   private void deferPreventiveUntilBroken(AutoArmor.Pending var1) {
-      // A falha preventiva pode ser temporária. scheduleRetry limita a próxima tentativa.
-   }
-
-   private void scheduleRetry(int var1) {
-      int var2 = ++this.failedAttempts[var1];
-      long var3 = var2 == 1 ? 1L : (var2 == 2 ? 2L : 4L);
-      this.retryAt[var1] = this.tick + var3;
-      if (var2 == 2) {
-         this.status.accept("Auto Armor: sem confirmação; tentando novamente");
-      } else if (var2 >= 4) {
-         this.status.accept("Auto Armor: troca não confirmada; verificando novamente");
-      }
-   }
-
-   private AutoArmor.Choice bestReplacement(int var1, zx var2, int var3) {
-      AutoArmor.Choice var4 = null;
-      AutoArmor.Choice var5 = null;
-      StringBuilder var6 = new StringBuilder();
-      int var7 = Math.max(0, Math.min(PREFERRED_MATERIALS.length - 1, this.preferredMaterial.getAsInt()));
-      boolean var8 = var2 != null && !isBroken(var2) && var3 > 0 && durabilityPercent(var2) <= var3;
-
-      for (int var9 = 0; var9 < 36; var9++) {
-         zx var10 = asStack(Inventory.stack(var9));
-         if (var10 != null) {
-            int var11 = Inventory.armorPiece(var10);
-            String var12 = "eligible";
-            if (var11 != var1) {
-               var12 = "wrong-piece:" + var11;
-            } else if (isBroken(var10)) {
-               var12 = "broken";
-            } else if ((var2 != null && !isBroken(var2)) && this.ignoreUnenchanted.getAsBoolean() && !var10.w()) {
-               var12 = "unenchanted";
-            } else if ((var2 == null || isBroken(var2)) && !this.useDamagedReserves.getAsBoolean() && durabilityPercent(var10) < 100) {
-               var12 = "damaged-reserve-disabled";
-            } else if (var8 && isPreventiveUpgrade(var10, var2)) {
-               var12 = "preventive-upgrade";
-            } else if (var8 && durabilityPercent(var10) > durabilityPercent(var2) && Inventory.armorValue(var10) < Inventory.armorValue(var2)) {
-               var12 = "preventive-fallback-lower-armor";
-            } else if (var8) {
-               var12 = "preventive-not-durable-enough";
+        }
+        pending.manualPauseLogged = false;
+        ItemStack cursor = asStack(Inventory.cursor());
+        if (pending.cursorDropIssued) {
+            if (cursor == null && (pending.cursorClearSeen || ++pending.cursorDropAge >= CURSOR_RETURN_TIMEOUT_TICKS)) {
+                log("descarte do cursor concluído: " + pieceName(pending.piece)
+                        + "; confirmação servidor=" + pending.cursorClearSeen);
+                return matchesReplacementArmor(asStack(Inventory.armor(pending.piece)), pending)
+                        ? ArmorSwapSafety.Outcome.CONFIRMED : ArmorSwapSafety.Outcome.ARMOR_CHANGED;
             }
-
-            if (var6.length() > 0) {
-               var6.append(" | ");
+            if (cursor != null && ++pending.cursorDropAge == CURSOR_RETURN_TIMEOUT_TICKS) {
+                log("descarte do cursor não confirmado; peça ainda no cursor: " + describe(cursor));
+                status.accept("Auto Armor: cursor ainda ocupado; intervenção manual necessária");
             }
-
-            var6.append("slot=")
-               .append(var9)
-               .append(':')
-               .append(describe(var10))
-               .append(" piece=")
-               .append(var11)
-               .append(" ench=")
-               .append(var10.w())
-               .append(" armor=")
-               .append(Inventory.armorValue(var10))
-               .append(" remaining=")
-               .append(durabilityPercent(var10))
-               .append("% reason=")
-               .append(var12);
-            boolean allowUnenchanted = (var2 == null || isBroken(var2)) || !this.ignoreUnenchanted.getAsBoolean();
-            if (var11 == var1 && !isBroken(var10) && (allowUnenchanted || var10.w())) {
-               boolean var13 = var2 == null || isBroken(var2);
-               if (!var13 || this.useDamagedReserves.getAsBoolean() || durabilityPercent(var10) >= 100) {
-                  AutoArmor.Choice var14 = new AutoArmor.Choice(var9, var10.k(), score(var10), isPreferred(var10, var7));
-                  if (var8 && !isPreventiveUpgrade(var10, var2)) {
-                     if (durabilityPercent(var10) > durabilityPercent(var2) && (var5 == null || compare(var14, var5) > 0)) {
-                        var5 = var14;
-                     }
-                  } else if (var4 == null || compare(var14, var4) > 0) {
-                     var4 = var14;
-                  }
-               }
+            return ArmorSwapSafety.Outcome.WAIT;
+        }
+        if (cursor != null) {
+            if (!matchesOldOrObservedCursor(cursor, pending)) {
+                if (!pending.cursorRecoveryWarned) {
+                    log("cursor ocupado por outro item durante " + pieceName(pending.piece)
+                            + "; item=" + describe(cursor) + "; antigo=" + describe(pending.oldArmor));
+                    status.accept("Auto Armor: cursor ocupado; troca pausada");
+                    pending.cursorRecoveryWarned = true;
+                }
+                return ArmorSwapSafety.Outcome.WAIT;
             }
-         }
-      }
+            if (pending.cursorReturnIndex >= 0
+                    && ++pending.cursorRecoveryAge < CURSOR_RETURN_TIMEOUT_TICKS) {
+                return ArmorSwapSafety.Outcome.WAIT;
+            }
+            if (pending.cursorReturnAttempts >= CURSOR_RETURN_MAX_ATTEMPTS) {
+                if (dropStuckCursor(cursor, true)) {
+                    return ArmorSwapSafety.Outcome.WAIT;
+                }
+                if (!pending.cursorRecoveryWarned) {
+                    log("devolução da peça antiga não confirmada após "
+                            + CURSOR_RETURN_MAX_ATTEMPTS + " tentativas; cursor=" + describe(cursor));
+                    status.accept("Auto Armor: peça no cursor; resolva no inventário");
+                    pending.cursorRecoveryWarned = true;
+                }
+                return ArmorSwapSafety.Outcome.WAIT;
+            }
+            int destination = Inventory.stack(pending.sourceIndex) == null
+                    ? pending.sourceIndex : Inventory.firstEmpty();
+            int slot = destination < 0 ? -1 : Inventory.slotOf(destination);
+            if (slot < 0 || Inventory.stack(destination) != null || !Inventory.accepts(slot, cursor)) {
+                if (++pending.cursorNoSlotAge >= CURSOR_NO_SLOT_GRACE_TICKS
+                        && dropStuckCursor(cursor, false)) {
+                    return ArmorSwapSafety.Outcome.WAIT;
+                }
+                if (!pending.cursorRecoveryWarned) {
+                    log("sem slot seguro para devolver peça antiga de " + pieceName(pending.piece)
+                            + "; cursor=" + describe(cursor) + "; source="
+                            + describe(asStack(Inventory.stack(pending.sourceIndex))));
+                    status.accept("Auto Armor: peça antiga no cursor; inventário cheio");
+                    pending.cursorRecoveryWarned = true;
+                }
+                return ArmorSwapSafety.Outcome.WAIT;
+            }
+            pending.cursorNoSlotAge = 0;
+            pending.cursorReturnIndex = destination;
+            pending.cursorRecoveryAge = 0;
+            pending.cursorReturnAttempts++;
+            pending.cursorClearSeen = false;
+            pending.cursorReturnSlotSeen = false;
+            log("devolvendo peça antiga do cursor: " + pieceName(pending.piece)
+                    + " -> inventário " + destination + "; item=" + describe(cursor));
+            if (!Inventory.pickup(slot)) {
+                pending.cursorReturnIndex = -1;
+                log("clique de devolução recusado para " + pieceName(pending.piece));
+            }
+            return ArmorSwapSafety.Outcome.WAIT;
+        }
+        if (pending.cursorReturnIndex >= 0) {
+            ArmorSwapSafety.Outcome outcome = ArmorSwapSafety.returned(true,
+                    matchesReplacementArmor(asStack(Inventory.armor(pending.piece)), pending),
+                    matchesOldOrObservedCursor(asStack(Inventory.stack(pending.cursorReturnIndex)), pending),
+                    pending.cursorClearSeen, pending.cursorReturnSlotSeen,
+                    ++pending.cursorRecoveryAge, CURSOR_RETURN_TIMEOUT_TICKS);
+            if (outcome != ArmorSwapSafety.Outcome.WAIT) {
+                log("devolução " + outcome + ": " + pieceName(pending.piece)
+                        + "; destino=" + describe(asStack(Inventory.stack(pending.cursorReturnIndex)))
+                        + "; armor=" + describe(asStack(Inventory.armor(pending.piece))));
+            }
+            return outcome;
+        }
+        return matchesReplacementArmor(asStack(Inventory.armor(pending.piece)), pending)
+                ? ArmorSwapSafety.Outcome.CONFIRMED : ArmorSwapSafety.Outcome.ARMOR_CHANGED;
+    }
 
-      if (var4 != null || var5 != null || this.lastNoChoiceLog[var1] == 0L || this.tick - this.lastNoChoiceLog[var1] >= 100L) {
-         log(
-            "scan reservas "
-               + pieceName(var1)
-               + "; worn="
-               + describe(var2)
-               + "; preventive="
-               + var8
-               + "; slots="
-               + (var6.length() == 0 ? "nenhuma armadura nos slots 0-35" : var6.toString())
-         );
-      }
-
-      return var4;
-   }
-
-   private static boolean isPreventiveUpgrade(zx var0, zx var1) {
-      return Inventory.armorValue(var0) >= Inventory.armorValue(var1)
-         && level(aci.c, var0) >= level(aci.c, var1)
-         && protectionScore(var0) >= protectionScore(var1)
-         && durabilityPercent(var0) > durabilityPercent(var1);
-   }
-
-   private static int compare(AutoArmor.Choice var0, AutoArmor.Choice var1) {
-      if (var0.preferred != var1.preferred) {
-         return var0.preferred ? 1 : -1;
-      }
-
-      int var2 = Long.compare(var0.score, var1.score);
-      return var2 != 0 ? var2 : Integer.compare(var1.inventoryIndex, var0.inventoryIndex);
-   }
-
-   private static long score(zx var0) {
-      return protectionScore(var0) + durabilityPercent(var0) * 1000L;
-   }
-
-   private static long protectionScore(zx var0) {
-      long var1 = Inventory.armorValue(var0) * 1000000L;
-      long var3 = level(aci.c, var0) * 250000L;
-      long var5 = (level(aci.d, var0) + level(aci.f, var0) + level(aci.g, var0) + level(aci.e, var0)) * 55000L;
-      long var7 = level(aci.j, var0) * 25000L + level(aci.t, var0) * 70000L;
-      return var1 + var3 + var5 + var7;
-   }
-
-   private static int level(aci var0, zx var1) {
-      return var0 == null ? 0 : Math.max(0, Math.min(20, ack.a(var0.B, var1)));
-   }
-
-   private static boolean isPreferred(zx var0, int var1) {
-      return var1 > 0 && var1 < PREFERRED_MATERIALS.length && var0.b() instanceof yj ? ((yj)var0.b()).x_() == PREFERRED_MATERIALS[var1] : false;
-   }
-
-   private static boolean isBroken(zx var0) {
-      int var1 = var0.j();
-      return var1 > 0 && var0.h() >= var1;
-   }
-
-   private static int durabilityPercent(zx var0) {
-      int var1 = var0.j();
-      return var1 > 0 && var0.e() ? Math.max(0, Math.min(100, (int)((var1 - var0.h()) * 100L / var1))) : 100;
-   }
-
-   private static boolean matchesExpected(zx var0, zx var1) {
-      return var0 != null && var1 != null ? zx.b(var0, var1) : var0 == var1;
-   }
-
-   private static boolean matchesEquipState(zx var0, zx var1, AutoArmor.Pending var2) {
-      if (!matchesReplacementArmor(var1, var2)) {
-         return false;
-      } else if (var2.oldArmor == null) {
-         return true;
-      } else {
-         return matchesFormerArmor(var0, var2) || var0 == null;
-      }
-   }
-
-   private static boolean matchesReplacementArmor(zx var0, AutoArmor.Pending var1) {
-      return !matchesArmor(var0, var1.expectedArmor)
-         ? false
-         : !sameKindDifferentDamage(var1.oldArmor, var1.expectedArmor) || ArmorSwapSafety.closerDamage(var0.h(), var1.expectedArmor.h(), var1.oldArmor.h());
-   }
-
-   private static boolean matchesFormerArmor(zx var0, AutoArmor.Pending var1) {
-      return !matchesArmor(var0, var1.oldArmor)
-         ? false
-         : var0 == null
-            || !sameKindDifferentDamage(var1.oldArmor, var1.expectedArmor)
-            || ArmorSwapSafety.closerDamage(var0.h(), var1.oldArmor.h(), var1.expectedArmor.h());
-   }
-
-   private static boolean matchesOldOrObservedCursor(zx var0, AutoArmor.Pending var1) {
-      return matchesFormerArmor(var0, var1) || var1.serverOldCursor != null && !var1.manualIntervened && matchesObservedCursor(var0, var1.serverOldCursor);
-   }
-
-   private static boolean matchesOldIdentityAndDamage(zx var0, AutoArmor.Pending var1) {
-      return var0 != null && var1.oldArmor != null && var0.b() == var1.oldArmor.b() && var0.b == var1.oldArmor.b && Inventory.armorPiece(var0) == var1.piece
-         ? !sameItemDifferentDamage(var1.oldArmor, var1.expectedArmor) || ArmorSwapSafety.closerDamage(var0.h(), var1.oldArmor.h(), var1.expectedArmor.h())
-         : false;
-   }
-
-   private static boolean matchesObservedCursor(zx var0, zx var1) {
-      return var0 != null && var1 != null && var0.b() == var1.b() && var0.b == var1.b && var0.h() == var1.h();
-   }
-
-   private static boolean sameItemDifferentDamage(zx var0, zx var1) {
-      return var0 != null && var1 != null && var0.b() == var1.b() && Math.abs((long)var0.h() - var1.h()) >= 32L;
-   }
-
-   private static boolean sameKindDifferentDamage(zx var0, zx var1) {
-      return var0 != null && var1 != null && matchesArmor(var0, var1) && Math.abs((long)var0.h() - var1.h()) >= 32L;
-   }
-
-   private static boolean matchesArmor(zx var0, zx var1) {
-      if (var0 != null && var1 != null) {
-         if (var0.b() == var1.b() && var0.b == var1.b) {
-            dn var2 = var0.o();
-            dn var3 = var1.o();
-            return var2 == null ? var3 == null : var2.equals(var3);
-         } else {
+    private boolean dropStuckCursor(ItemStack cursor, boolean retriesExhausted) {
+        boolean owned = pending.serverOldCursor != null
+                && matchesObservedCursor(cursor, pending.serverOldCursor);
+        boolean eligible = ArmorSwapSafety.mayDropStuckOld(dropStuckOld.getAsBoolean(),
+                pending.manualIntervened, owned, pending.serverConfirmed,
+                matchesReplacementArmor(asStack(Inventory.armor(pending.piece)), pending),
+                retriesExhausted, pending.cursorNoSlotAge, CURSOR_NO_SLOT_GRACE_TICKS);
+        if (!eligible) {
             return false;
-         }
-      } else {
-         return var0 == var1;
-      }
-   }
+        }
+        pending.cursorDropIssued = true; // never send a second drop click for this exchange
+        pending.cursorDropAge = 0;
+        pending.cursorClearSeen = false;
+        log("ÚLTIMO RECURSO: descartando peça antiga presa no cursor: " + describe(cursor)
+                + "; tentativas de devolução=" + pending.cursorReturnAttempts
+                + "; sem slot ticks=" + pending.cursorNoSlotAge);
+        status.accept("Auto Armor: peça antiga presa descartada");
+        if (Inventory.dropCursor()) {
+            return true;
+        }
+        log("descarte do cursor recusado pelo SDK; peça preservada no cursor");
+        status.accept("Auto Armor: não foi possível liberar o cursor");
+        return false;
+    }
 
-   private static zx asStack(Object var0) {
-      return var0 instanceof zx ? (zx)var0 : null;
-   }
+    private void finishRejected() {
+        if (pending == null) {
+            return;
+        }
+        log("troca rejeitada/desync " + pieceName(pending.piece) + "; tentativa="
+                + (failedAttempts[pending.piece] + 1));
+        scheduleRetry(pending.piece);
+        pending = null;
+    }
 
-   private static zx copy(zx var0) {
-      return var0 == null ? null : var0.k();
-   }
+    private void scheduleRetry(int piece) {
+        int failures = ++failedAttempts[piece];
+        long delay = failures == 1 ? FIRST_RETRY_TICKS
+                : failures == 2 ? SECOND_RETRY_TICKS : LATER_RETRY_TICKS;
+        retryAt[piece] = tick + delay;
+        if (failures == 2) {
+            status.accept("Auto Armor: sem confirmação; tentando novamente");
+        } else if (failures >= 4) {
+            status.accept("Auto Armor: troca não confirmada; verificando novamente");
+        }
+    }
 
-   private static String pieceName(int var0) {
-      switch (var0) {
-         case 0:
-            return "botas";
-         case 1:
-            return "calças";
-         case 2:
-            return "peitoral";
-         case 3:
-            return "elmo";
-         default:
-            return "peça";
-      }
-   }
+    private Choice bestReplacement(int piece, ItemStack worn, int threshold) {
+        Choice best = null;
+        Choice preventiveFallback = null;
+        StringBuilder inventoryScan = new StringBuilder();
+        int preference = Math.max(0, Math.min(PREFERRED_MATERIALS.length - 1, preferredMaterial.getAsInt()));
+        boolean preventive = worn != null && !isBroken(worn)
+                && threshold > 0 && durabilityPercent(worn) <= threshold;
+        for (int slot = Inventory.HOTBAR_START; slot < Inventory.ARMOR_START; slot++) {
+            ItemStack candidate = asStack(Inventory.stack(slot));
+            if (candidate == null) {
+                continue;
+            }
+            int candidatePiece = Inventory.armorPiece(candidate);
+            String rejection = "eligible";
+            boolean emergencyReplacement = worn == null || isBroken(worn);
+            boolean allowUnenchanted = emergencyReplacement || !ignoreUnenchanted.getAsBoolean();
+            if (candidatePiece != piece) rejection = "wrong-piece:" + candidatePiece;
+            else if (isBroken(candidate)) rejection = "broken";
+            else if (!allowUnenchanted && !candidate.isItemEnchanted()) rejection = "unenchanted";
+            else if ((worn == null || isBroken(worn)) && !useDamagedReserves.getAsBoolean()
+                    && durabilityPercent(candidate) < 100) rejection = "damaged-reserve-disabled";
+            else if (preventive && isPreventiveUpgrade(candidate, worn)) rejection = "preventive-upgrade";
+            else if (preventive && durabilityPercent(candidate) > durabilityPercent(worn)
+                    && Inventory.armorValue(candidate) < Inventory.armorValue(worn)) rejection = "preventive-fallback-lower-armor";
+            else if (preventive) rejection = "preventive-not-durable-enough";
+            if (inventoryScan.length() > 0) inventoryScan.append(" | ");
+            inventoryScan.append("slot=").append(slot).append(':').append(describe(candidate))
+                    .append(" piece=").append(candidatePiece).append(" ench=")
+                    .append(candidate.isItemEnchanted()).append(" armor=")
+                    .append(Inventory.armorValue(candidate)).append(" remaining=")
+                    .append(durabilityPercent(candidate)).append("% reason=").append(rejection);
+            if (candidatePiece != piece || isBroken(candidate)) {
+                continue;
+            }
+            if (!allowUnenchanted && !candidate.isItemEnchanted()) {
+                continue;
+            }
+            if (emergencyReplacement && !useDamagedReserves.getAsBoolean()
+                    && durabilityPercent(candidate) < 100) {
+                continue;
+            }
+            Choice choice = new Choice(slot, candidate.copy(), score(candidate), isPreferred(candidate, preference));
+            if (preventive && !isPreventiveUpgrade(candidate, worn)) {
+                // At the preventive threshold, do not leave a piece on until it breaks just
+                // because the only fresh reserve has fewer base armor points (e.g. iron
+                // leggings replacing nearly-broken diamond leggings). Preserve durability;
+                // prefer the strict upgrade when one exists, otherwise keep this fallback.
+                if (durabilityPercent(candidate) > durabilityPercent(worn)
+                        && (preventiveFallback == null || compare(choice, preventiveFallback) > 0)) {
+                    preventiveFallback = choice;
+                }
+                continue;
+            }
+            if (best == null || compare(choice, best) > 0) {
+                best = choice;
+            }
+        }
+        if (best != null || preventiveFallback != null || lastNoChoiceLog[piece] == 0L
+                || tick - lastNoChoiceLog[piece] >= 100L) {
+            log("scan reservas " + pieceName(piece) + "; worn=" + describe(worn) + "; preventive="
+                    + preventive + "; slots=" + (inventoryScan.length() == 0
+                            ? "nenhuma armadura nos slots 0-35" : inventoryScan.toString()));
+        }
+        return best != null ? best : preventiveFallback;
+    }
 
-   private static String describe(zx var0) {
-      if (var0 == null) {
-         return "vazio";
-      }
+    /** Requires more remaining durability and no loss of base armor points. */
+    private static boolean isPreventiveUpgrade(ItemStack candidate, ItemStack worn) {
+        return Inventory.armorValue(candidate) >= Inventory.armorValue(worn)
+                && durabilityPercent(candidate) > durabilityPercent(worn);
+    }
 
-      int var1 = var0.j();
-      String var2 = var1 > 0 ? var1 - var0.h() + "/" + var1 : "indestrutível";
-      return var0.b().a() + "[" + var2 + ";meta=" + var0.i() + ";count=" + var0.b + ";ench=" + var0.w() + "]";
-   }
+    private static int compare(Choice left, Choice right) {
+        if (left.preferred != right.preferred) {
+            return left.preferred ? 1 : -1;
+        }
+        int quality = Long.compare(left.score, right.score);
+        return quality != 0 ? quality : AutoArmorHelper.compareSlots(left.inventoryIndex, right.inventoryIndex);
+    }
 
-   private static String pendingSummary(AutoArmor.Pending var0) {
-      return "piece="
-         + pieceName(var0.piece)
-         + "; sourceIndex="
-         + var0.sourceIndex
-         + "; old="
-         + describe(var0.oldArmor)
-         + "; expectedSource="
-         + describe(var0.expectedSource)
-         + "; expectedArmor="
-         + describe(var0.expectedArmor)
-         + "; age="
-         + var0.age
-         + "; local="
-         + var0.localApplied
-         + "; server="
-         + var0.serverConfirmed
-         + "; sourceSeen="
-         + var0.sourceSeen
-         + "; armorSeen="
-         + var0.armorSeen
-         + "; preventive="
-         + var0.preventive
-         + "; dropping="
-         + var0.dropping
-         + "; rejected="
-         + var0.rejected;
-   }
+    private static long score(ItemStack stack) {
+        return protectionScore(stack) + (long) durabilityPercent(stack) * 1_000L;
+    }
 
-   private static void logConfirmation(String var0, AutoArmor.Pending var1) {
-      String var2 = var1.source == null && var1.oldArmor != null ? "; origem vazia, verificando cursor" : "";
-      log(var0 + " confirmou " + pieceName(var1.piece) + var2 + "; reserve=" + describe(var1.armor));
-   }
+    private static long protectionScore(ItemStack stack) {
+        long armor = (long) Inventory.armorValue(stack) * 1_000_000L;
+        long general = (long) level(Enchantment.protection, stack) * 250_000L;
+        long specialized = (long) (level(Enchantment.fireProtection, stack)
+                + level(Enchantment.blastProtection, stack)
+                + level(Enchantment.projectileProtection, stack)
+                + level(Enchantment.featherFalling, stack)) * 55_000L;
+        long utility = (long) level(Enchantment.thorns, stack) * 25_000L
+                + (long) level(Enchantment.unbreaking, stack) * 70_000L;
+        return armor + general + specialized + utility;
+    }
 
-   private static void log(String var0) {
-      ArmorLog.write("AutoArmor", var0);
-   }
+    private static int level(Enchantment enchantment, ItemStack stack) {
+        return enchantment == null ? 0 : Math.max(0, Math.min(20,
+                EnchantmentHelper.getEnchantmentLevel(enchantment.effectId, stack)));
+    }
 
-   private static final class Choice {
-      final int inventoryIndex;
-      final zx stack;
-      final long score;
-      final boolean preferred;
+    private static boolean isPreferred(ItemStack stack, int preference) {
+        if (preference <= 0 || preference >= PREFERRED_MATERIALS.length
+                || !(stack.getItem() instanceof ItemArmor)) {
+            return false;
+        }
+        return ((ItemArmor) stack.getItem()).getArmorMaterial() == PREFERRED_MATERIALS[preference];
+    }
 
-      Choice(int var1, zx var2, long var3, boolean var5) {
-         this.inventoryIndex = var1;
-         this.stack = var2;
-         this.score = var3;
-         this.preferred = var5;
-      }
-   }
+    static boolean isBroken(ItemStack stack) {
+        int maxDamage = stack.getMaxDamage();
+        return maxDamage > 0 && stack.getItemDamage() >= maxDamage;
+    }
 
-   private static final class Pending {
-      final int piece;
-      final int sourceIndex;
-      final zx replacement;
-      final zx oldArmor;
-      final zx expectedSource;
-      final zx expectedArmor;
-      final boolean dropOld;
-      final boolean preventive;
-      zx source;
-      zx armor;
-      boolean sourceSeen;
-      boolean armorSeen;
-      boolean localApplied;
-      boolean serverConfirmed;
-      boolean rejected;
-      boolean dropping;
-      boolean cursorTimeoutLogged;
-      boolean cursorRecoveryWarned;
-      boolean manualPauseLogged;
-      boolean cursorClearSeen;
-      boolean cursorReturnSlotSeen;
-      boolean manualIntervened;
-      boolean cursorDropIssued;
-      zx serverOldCursor;
-      int cursorReturnIndex = -1;
-      int cursorRecoveryAge;
-      int cursorReturnAttempts;
-      int cursorNoSlotAge;
-      int cursorDropAge;
-      int age;
+    private static int durabilityPercent(ItemStack stack) {
+        int maxDamage = stack.getMaxDamage();
+        if (maxDamage <= 0 || !stack.isItemStackDamageable()) {
+            return 100;
+        }
+        return Math.max(0, Math.min(100, (int) ((long) (maxDamage - stack.getItemDamage()) * 100L / maxDamage)));
+    }
 
-      Pending(int var1, int var2, zx var3, zx var4, boolean var5) {
-         this.piece = var1;
-         this.sourceIndex = var2;
-         this.replacement = var3.k();
-         this.oldArmor = AutoArmor.copy(var4);
-         this.expectedSource = AutoArmor.copy(var4);
-         this.expectedArmor = var3.k();
-         this.dropOld = var5;
-         this.preventive = var4 != null && !AutoArmor.isBroken(var4);
-      }
-   }
+    private static boolean matchesExpected(ItemStack actual, ItemStack expected) {
+        if (actual == null || expected == null) {
+            return actual == expected;
+        }
+        return ItemStack.areItemStacksEqual(actual, expected);
+    }
+
+    /**
+     * The previously worn piece may break on the server while the preventive swap is in flight.
+     * In that case it disappears instead of returning to the source slot, but the new piece can
+     * still have been equipped successfully.
+     */
+    private static boolean matchesEquipState(ItemStack source, ItemStack armor, Pending operation) {
+        if (!matchesReplacementArmor(armor, operation)) {
+            return false;
+        }
+        if (operation.oldArmor == null) {
+            return true;
+        }
+        return matchesFormerArmor(source, operation) || source == null;
+    }
+
+    private static boolean matchesReplacementArmor(ItemStack actual, Pending operation) {
+        if (!matchesArmor(actual, operation.expectedArmor)) {
+            return false;
+        }
+        return !sameKindDifferentDamage(operation.oldArmor, operation.expectedArmor)
+                || ArmorSwapSafety.closerDamage(actual.getItemDamage(),
+                        operation.expectedArmor.getItemDamage(), operation.oldArmor.getItemDamage());
+    }
+
+    private static boolean matchesFormerArmor(ItemStack actual, Pending operation) {
+        if (!matchesArmor(actual, operation.oldArmor)) {
+            return false;
+        }
+        return actual == null || !sameKindDifferentDamage(operation.oldArmor, operation.expectedArmor)
+                || ArmorSwapSafety.closerDamage(actual.getItemDamage(),
+                        operation.oldArmor.getItemDamage(), operation.expectedArmor.getItemDamage());
+    }
+
+    private static boolean matchesOldOrObservedCursor(ItemStack actual, Pending operation) {
+        return matchesFormerArmor(actual, operation)
+                || operation.serverOldCursor != null && !operation.manualIntervened
+                && matchesObservedCursor(actual, operation.serverOldCursor);
+    }
+
+    /** O servidor pode atualizar NBT/durabilidade da peça velha durante o combate. */
+    private static boolean matchesOldIdentityAndDamage(ItemStack actual, Pending operation) {
+        if (actual == null || operation.oldArmor == null
+                || actual.getItem() != operation.oldArmor.getItem()
+                || actual.stackSize != operation.oldArmor.stackSize
+                || Inventory.armorPiece(actual) != operation.piece) {
+            return false;
+        }
+        return !sameItemDifferentDamage(operation.oldArmor, operation.expectedArmor)
+                || ArmorSwapSafety.closerDamage(actual.getItemDamage(),
+                        operation.oldArmor.getItemDamage(), operation.expectedArmor.getItemDamage());
+    }
+
+    private static boolean matchesObservedCursor(ItemStack actual, ItemStack observed) {
+        return actual != null && observed != null && actual.getItem() == observed.getItem()
+                && actual.stackSize == observed.stackSize
+                && actual.getItemDamage() == observed.getItemDamage();
+    }
+
+    private static boolean sameItemDifferentDamage(ItemStack oldArmor, ItemStack replacement) {
+        return oldArmor != null && replacement != null && oldArmor.getItem() == replacement.getItem()
+                && Math.abs((long) oldArmor.getItemDamage() - replacement.getItemDamage())
+                        >= MIN_DISTINGUISHABLE_DAMAGE_GAP;
+    }
+
+    private static boolean sameKindDifferentDamage(ItemStack oldArmor, ItemStack replacement) {
+        return oldArmor != null && replacement != null && matchesArmor(oldArmor, replacement)
+                && Math.abs((long) oldArmor.getItemDamage() - replacement.getItemDamage())
+                        >= MIN_DISTINGUISHABLE_DAMAGE_GAP;
+    }
+
+    /**
+     * The equipped stack can lose durability while PvP is ongoing, even before the server's
+     * slot acknowledgement arrives. Match its identity and NBT, not its mutable damage value.
+     */
+    private static boolean matchesArmor(ItemStack actual, ItemStack expected) {
+        if (actual == null || expected == null) {
+            return actual == expected;
+        }
+        if (actual.getItem() != expected.getItem() || actual.stackSize != expected.stackSize) {
+            return false;
+        }
+        NBTTagCompound actualTag = actual.getTagCompound();
+        NBTTagCompound expectedTag = expected.getTagCompound();
+        return actualTag == null ? expectedTag == null : actualTag.equals(expectedTag);
+    }
+
+    private static ItemStack asStack(Object value) {
+        return value instanceof ItemStack ? (ItemStack) value : null;
+    }
+
+    static ItemStack copy(ItemStack stack) {
+        return stack == null ? null : stack.copy();
+    }
+
+    private static String pieceName(int piece) {
+        switch (piece) {
+            case Inventory.HELMET: return "elmo";
+            case Inventory.CHESTPLATE: return "peitoral";
+            case Inventory.LEGGINGS: return "calças";
+            case Inventory.BOOTS: return "botas";
+            default: return "peça";
+        }
+    }
+
+    private static String describe(ItemStack stack) {
+        if (stack == null) {
+            return "vazio";
+        }
+        int maximum = stack.getMaxDamage();
+        String durability = maximum > 0
+                ? (maximum - stack.getItemDamage()) + "/" + maximum
+                : "indestrutível";
+        return stack.getItem().getUnlocalizedName() + "[" + durability + ";meta=" + stack.getMetadata()
+                + ";count=" + stack.stackSize + ";ench=" + stack.isItemEnchanted() + "]";
+    }
+
+    private static String pendingSummary(Pending operation) {
+        return "piece=" + pieceName(operation.piece) + "; sourceIndex=" + operation.sourceIndex
+                + "; old=" + describe(operation.oldArmor) + "; expectedSource="
+                + describe(operation.expectedSource) + "; expectedArmor=" + describe(operation.expectedArmor)
+                + "; age=" + operation.age + "; local=" + operation.localApplied
+                + "; server=" + operation.serverConfirmed + "; sourceSeen=" + operation.sourceSeen
+                + "; armorSeen=" + operation.armorSeen + "; preventive=" + operation.preventive
+                + "; dropping=" + operation.dropping + "; rejected=" + operation.rejected;
+    }
+
+    private static void logConfirmation(String source, Pending operation) {
+        String detail = operation.source == null && operation.oldArmor != null
+                ? "; origem vazia, verificando cursor" : "";
+        log(source + " confirmou " + pieceName(operation.piece) + detail
+                + "; reserve=" + describe(operation.armor));
+    }
+
+    /** Transitions only (no per-tick spam); visible in .minecraft/logs/latest.log. */
+    private static void log(String message) {
+        DebugLog.write("AutoArmor", message);
+    }
+
+    private static final class Choice {
+        final int inventoryIndex;
+        final ItemStack stack;
+        final long score;
+        final boolean preferred;
+
+        Choice(int inventoryIndex, ItemStack stack, long score, boolean preferred) {
+            this.inventoryIndex = inventoryIndex;
+            this.stack = stack;
+            this.score = score;
+            this.preferred = preferred;
+        }
+    }
+
+    private static final class Pending {
+        final int piece;
+        final int sourceIndex;
+        final ItemStack replacement;
+        final ItemStack oldArmor;
+        final ItemStack expectedSource;
+        final ItemStack expectedArmor;
+        final boolean dropOld;
+        final boolean preventive;
+        ItemStack source;
+        ItemStack armor;
+        boolean sourceSeen;
+        boolean armorSeen;
+        boolean localApplied;
+        boolean serverConfirmed;
+        boolean rejected;
+        boolean dropping;
+        boolean cursorTimeoutLogged;
+        boolean cursorRecoveryWarned;
+        boolean manualPauseLogged;
+        boolean cursorClearSeen;
+        boolean cursorReturnSlotSeen;
+        boolean manualIntervened;
+        boolean cursorDropIssued;
+        ItemStack serverOldCursor;
+        int cursorReturnIndex = -1;
+        int cursorRecoveryAge;
+        int cursorReturnAttempts;
+        int cursorNoSlotAge;
+        int cursorDropAge;
+        int age;
+
+        Pending(int piece, int sourceIndex, ItemStack replacement, ItemStack oldArmor, boolean dropOld) {
+            this.piece = piece;
+            this.sourceIndex = sourceIndex;
+            this.replacement = replacement.copy();
+            this.oldArmor = copy(oldArmor);
+            this.expectedSource = copy(oldArmor);
+            this.expectedArmor = replacement.copy();
+            this.dropOld = dropOld;
+            this.preventive = oldArmor != null && !isBroken(oldArmor);
+        }
+    }
 }

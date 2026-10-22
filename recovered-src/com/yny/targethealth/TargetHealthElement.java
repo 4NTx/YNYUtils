@@ -1,9 +1,11 @@
 package com.yny.targethealth;
 
+import com.yny.utils.core.DebugLog;
 import dev.xavier.stein.loader.api.Entities;
 import dev.xavier.stein.loader.api.HudElement;
 import dev.xavier.stein.loader.api.HudPlacement;
 import dev.xavier.stein.loader.api.Option;
+import dev.xavier.stein.loader.api.Relation;
 import dev.xavier.stein.loader.api.Relations;
 import dev.xavier.stein.loader.api.Render;
 import dev.xavier.stein.loader.api.Stacks;
@@ -11,6 +13,7 @@ import dev.xavier.stein.loader.api.Targeting;
 import dev.xavier.stein.loader.api.Targeting.Hit;
 import dev.xavier.stein.loader.api.Targeting.Query;
 import dev.xavier.stein.loader.api.Targeting.Ray;
+import java.lang.reflect.Method;
 import java.util.Locale;
 
 public final class TargetHealthElement implements HudElement {
@@ -37,6 +40,71 @@ public final class TargetHealthElement implements HudElement {
    private int scanCooldown;
    private long animationAt;
 
+   private static Method heldItemMethod;
+   private static Method armorItemMethod;
+   private static boolean reflectionInitialized;
+
+   private static synchronized void initReflection(Class<?> clazz) {
+      if (reflectionInitialized || clazz == null) return;
+      Class<?> cur = clazz;
+      while (cur != null && cur != Object.class) {
+         if (heldItemMethod == null) {
+            for (String mName : new String[]{"bA", "getHeldItem", "d"}) {
+               try {
+                  Method m = cur.getDeclaredMethod(mName);
+                  m.setAccessible(true);
+                  heldItemMethod = m;
+                  break;
+               } catch (Throwable ignored) {}
+            }
+         }
+         if (armorItemMethod == null) {
+            for (String mName : new String[]{"q", "getCurrentArmor", "p"}) {
+               try {
+                  Method m = cur.getDeclaredMethod(mName, Integer.TYPE);
+                  m.setAccessible(true);
+                  armorItemMethod = m;
+                  break;
+               } catch (Throwable ignored) {}
+            }
+         }
+         if (heldItemMethod != null && armorItemMethod != null) {
+            reflectionInitialized = true;
+            return;
+         }
+         cur = cur.getSuperclass();
+      }
+   }
+
+   private static Object getHeldItem(Object living) {
+      if (living == null) return null;
+      try {
+         if (!reflectionInitialized) initReflection(living.getClass());
+         if (heldItemMethod != null) return heldItemMethod.invoke(living);
+      } catch (Throwable ignored) {}
+      return null;
+   }
+
+   private static Object getArmorItem(Object living, int slot) {
+      if (living == null) return null;
+      try {
+         if (!reflectionInitialized) initReflection(living.getClass());
+         if (armorItemMethod != null) return armorItemMethod.invoke(living, slot);
+      } catch (Throwable ignored) {}
+      return null;
+   }
+
+   private static boolean isArmorStand(Object entity) {
+      if (entity == null) return false;
+      String cName = entity.getClass().getName();
+      if (cName.equals("um") || cName.endsWith(".EntityArmorStand")) return true;
+      try {
+         String type = Entities.typeName(entity);
+         if (type != null && type.toLowerCase(Locale.ROOT).contains("armorstand")) return true;
+      } catch (Throwable ignored) {}
+      return false;
+   }
+
    public void updateDistantTarget() {
       Object self = Entities.self();
       if (self == null || !TargetHealthMod.settings.showDistantTargets) {
@@ -56,16 +124,14 @@ public final class TargetHealthElement implements HudElement {
       double reach = range();
       scanCooldown = reach >= 48.0D ? 3 : 1;
       Query query = Targeting.query().reach(reach).living().margin(0.3D).cutAtBlock().exclude(self);
-      if (TargetHealthMod.settings.ignoreLeaves) {
-         query.passThrough(Targeting.FOLIAGE);
-      }
-      Ray ray = Targeting.raycast(query);
-      distantTarget = firstDisplayableTarget(ray);
+      if (TargetHealthMod.settings.ignoreLeaves) query.passThrough(Targeting.FOLIAGE);
+      distantTarget = firstDisplayableTarget(Targeting.raycast(query));
    }
 
    public void updateTarget() {
-      Object next = findTarget();
-      if (next == null) {
+      Object candidate = TargetGrace.choose(findTarget(), target);
+      if (candidate == null || !Entities.isLiving(candidate) || isIgnoredTarget(candidate)) {
+         if (target != null) DebugLog.state("DamageIndicator", "target", "none");
          target = null;
          heldItem = null;
          heldName = "Mão vazia";
@@ -76,24 +142,28 @@ public final class TargetHealthElement implements HudElement {
          advanceAnimation(System.currentTimeMillis());
          return;
       }
-
+      Object next = candidate;
       boolean changed = next != target;
       target = next;
-      name = safeDisplayName(next);
-      float nextHealth = Math.max(0.0F, Entities.health(next));
+      name = TargetClanName.display(next);
+      if (changed) DebugLog.state("DamageIndicator", "target", name);
+      float nextHealth = Math.max(0.0F, HealthEventLatch.health(Entities.health(next), next));
       float nextMaximum = Math.max(1.0F, Entities.maxHealth(next));
-      float nextAbsorption = Math.max(0.0F, Entities.absorption(next));
+      float nextAbsorption = Math.max(0.0F, HealthEventLatch.absorption(Entities.absorption(next), next));
       armorPoints = Math.max(0, Entities.armor(next));
       acceptHealth(nextHealth, nextMaximum, nextAbsorption, changed, System.currentTimeMillis());
       Object self = Entities.self();
       distanceText = self == null ? "" : String.format(Locale.ROOT, "%.1fm", (double)Entities.distance(self, next));
       readEquipment(next);
+      DebugLog.state("DamageIndicator", "distance", DistanceLog.bucket(distanceText));
+      DebugLog.state("DamageIndicator", "held", heldName + "; durability=" + heldDurability);
+      DebugLog.state("DamageIndicator", "armor", armorSummary());
    }
 
-   /** Receives the server-applied health update as well as polling it during HUD layout. */
    public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
                                float newAbsorption) {
       if (entity == null || entity != target) return;
+      HealthEventLatch.record(entity, newHealth, newAbsorption);
       acceptHealth(Math.max(0.0F, newHealth), Math.max(1.0F, Entities.maxHealth(entity)),
               Math.max(0.0F, newAbsorption), false, System.currentTimeMillis());
    }
@@ -105,6 +175,7 @@ public final class TargetHealthElement implements HudElement {
       maximum = nextMaximum;
       absorption = nextAbsorption;
       healthText = format(health) + " / " + format(maximum);
+      if (Math.abs(health - priorHealth) > 0.01F) DebugLog.write("DamageIndicator", "health=" + format(priorHealth) + "->" + format(health) + "; max=" + format(maximum) + "; absorption=" + format(absorption));
       if (changed || animationAt == 0L) {
          animatedHealth = health;
          damageTrailHealth = health;
@@ -133,30 +204,21 @@ public final class TargetHealthElement implements HudElement {
       if (animatedHealth >= health) damageTrailHealth = Math.max(health, damageTrailHealth - elapsed * 10.0F);
    }
 
-   private void readEquipment(Object entity) {
-      heldItem = null;
-      heldName = "Mão vazia";
-      heldDurability = "";
-      for (int i = 0; i < armor.length; i++) armor[i] = null;
-      if (!(entity instanceof pr)) return;
-      pr living = (pr)entity;
-      heldItem = living.bA();
-      if (heldItem != null) {
-         heldName = safeStackName(heldItem);
-         heldDurability = durability(heldItem);
-      }
-      Object[] worn = living.as();
-      if (worn != null) {
-         // EntityLivingBase equipment order is boots, leggings, chestplate, helmet.
-         armor[0] = slot(worn, 3);
-         armor[1] = slot(worn, 2);
-         armor[2] = slot(worn, 1);
-         armor[3] = slot(worn, 0);
-      }
+   private void readEquipment(Object living) {
+      heldItem = getHeldItem(living);
+      heldName = heldItem == null ? "Mão vazia / sem dados" : safeStackName(heldItem);
+      heldDurability = heldItem == null ? "" : durability(heldItem);
+      for (int i = 0; i < armor.length; i++) armor[i] = getArmorItem(living, 3 - i);
    }
 
-   private static Object slot(Object[] items, int index) {
-      return index >= 0 && index < items.length ? items[index] : null;
+   private String armorSummary() {
+      StringBuilder value = new StringBuilder();
+      for (int i = 0; i < armor.length; i++) {
+         if (i > 0) value.append(" | ");
+         Object stack = armor[i];
+         value.append(ARMOR_LABELS[i]).append("=").append(stack == null ? "empty" : safeStackName(stack) + "; durability=" + durability(stack));
+      }
+      return value.toString();
    }
 
    private static String durability(Object stack) {
@@ -171,9 +233,7 @@ public final class TargetHealthElement implements HudElement {
       try {
          String value = Stacks.name(stack);
          return value == null || value.trim().isEmpty() ? "Item" : value;
-      } catch (Throwable ignored) {
-         return "Item";
-      }
+      } catch (Throwable ignored) { return "Item"; }
    }
 
    private static String safeDisplayName(Object entity) {
@@ -187,9 +247,10 @@ public final class TargetHealthElement implements HudElement {
 
    private Object findTarget() {
       Object direct = directTarget();
-      if (direct != null && !isIgnoredTarget(direct)) return direct;
-      return distantTarget != null && Entities.isAlive(distantTarget) && !isIgnoredTarget(distantTarget)
-              ? distantTarget : null;
+      if (direct != null && Entities.isLiving(direct) && !isIgnoredTarget(direct)) return direct;
+      Object webTarget = com.yny.utils.modules.pvp.HitThroughWeb.findTargetThroughWeb();
+      if (webTarget != null && Entities.isLiving(webTarget) && !isIgnoredTarget(webTarget)) return webTarget;
+      return distantTarget != null && Entities.isAlive(distantTarget) && !isIgnoredTarget(distantTarget) ? distantTarget : null;
    }
 
    private static Object directTarget() {
@@ -207,9 +268,20 @@ public final class TargetHealthElement implements HudElement {
       return null;
    }
 
-   private static boolean isIgnoredTarget(Object entity) {
-      if (TargetHealthMod.settings.ignoreArmorStands && entity instanceof um) return true;
-      return TargetHealthMod.settings.ignoreAllies && Relations.of(entity).friendly();
+   public static boolean isIgnoredTarget(Object entity) {
+      if (entity == null) return true;
+      if (TargetHealthMod.settings.ignoreArmorStands && isArmorStand(entity)) return true;
+      if (com.yny.utils.modules.clanping.PingClanName.isDuelTarget(entity)) return false;
+      Relation rel = null;
+      try {
+         rel = Relations.of(entity);
+         if (rel == Relation.GROUP || rel == Relation.SELF) return true;
+      } catch (Throwable ignored) {}
+      try {
+         String nick = Entities.name(entity);
+         if (com.yny.utils.modules.clanping.PingClanName.isSameClan(entity, nick)) return true;
+      } catch (Throwable ignored) {}
+      return TargetHealthMod.settings.ignoreAllies && rel != null && rel.friendly();
    }
 
    public String id() { return TargetHealthMod.ID + ".target"; }
@@ -217,7 +289,9 @@ public final class TargetHealthElement implements HudElement {
 
    public boolean layout(boolean preview, float partialTicks) {
       if (!TargetHealthMod.settings.enabled) return false;
-      updateTarget();
+      if (target != null && isIgnoredTarget(target)) {
+         target = null;
+      }
       if (target == null && !preview) return false;
       if (target == null) {
          name = "Jogador [Clã]";
@@ -245,12 +319,25 @@ public final class TargetHealthElement implements HudElement {
    }
 
    private void drawClassic(int x, int width) {
-      if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 4, 0xFFFFFFFF, true);
+      if (TargetHealthMod.settings.showName) {
+         Render.roundRect(x + 3, 2, 18, 18, 2.0F, 0xFF9C6848);
+         Render.rect(x + 8, 8, 2, 2, 0xFF33251C);
+         Render.rect(x + 14, 8, 2, 2, 0xFF33251C);
+         Render.rect(x + 9, 14, 6, 1, 0xFF633C2B);
+         int nameWidth = width - 48;
+         if (TargetHealthMod.settings.showDistance && !distanceText.isEmpty()) {
+            nameWidth = width - Render.textWidth(distanceText) - 45;
+         }
+         Render.text(Render.trim(name, nameWidth), x + 25, 5, 0xFFFFFFFF, true);
+      }
+      if (TargetHealthMod.settings.showDistance && !distanceText.isEmpty()) {
+         Render.text(distanceText, x + width - Render.textWidth(distanceText) - 4, 5, 0xFFFFDA80, true);
+      }
       if (TargetHealthMod.settings.showNumbers) {
-         Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 4,
+         Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 17,
                  barColor(health / maximum), true);
       }
-      drawBar(x + 3, 18, width - 6, BAR_HEIGHT);
+      drawBar(x + 3, 20, width - 56, 5);
    }
 
    private void drawHearts(int x, int width) {
@@ -258,28 +345,20 @@ public final class TargetHealthElement implements HudElement {
       int trail = Math.min(10, (int)Math.ceil(10.0F * damageTrailHealth / maximum));
       int filled = Math.min(10, (int)Math.ceil(10.0F * animatedHealth / maximum));
       int color = barColor(health / maximum);
-      for (int i = 0; i < 10; i++) {
-         int heartColor = i < filled ? color : i < trail ? 0xFFFF625D : 0xFF49343A;
-         Render.text("❤", x + 3 + i * 12, 17, heartColor, true);
-      }
-      if (TargetHealthMod.settings.showNumbers) {
-         Render.text(healthText, x + 3, 27, 0xFFFFFFFF, true);
-      }
+      for (int i = 0; i < 10; i++) Render.text("❤", x + 3 + i * 12, 17,
+              i < filled ? color : i < trail ? 0xFFFF625D : 0xFF49343A, true);
+      if (TargetHealthMod.settings.showNumbers) Render.text(healthText, x + 3, 27, 0xFFFFFFFF, true);
    }
 
    private void drawCompact(int x, int width) {
       if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 3, 0xFFFFFFFF, true);
-      if (TargetHealthMod.settings.showNumbers) {
-         Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 3, barColor(health / maximum), true);
-      }
+      if (TargetHealthMod.settings.showNumbers) Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 3, barColor(health / maximum), true);
       drawBar(x + 3, 14, width - 6, 3);
    }
 
    private void drawMinimal(int x, int width) {
       if (TargetHealthMod.settings.showName) Render.text(Render.trim(name, width - 12), x + 3, 2, 0xFFFFFFFF, true);
-      if (TargetHealthMod.settings.showNumbers) {
-         Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 2, 0xFFFFFFFF, true);
-      }
+      if (TargetHealthMod.settings.showNumbers) Render.text(healthText, x + width - Render.textWidth(healthText) - 4, 2, 0xFFFFFFFF, true);
       drawBar(x + 3, 13, width - 6, 5);
    }
 
@@ -296,78 +375,37 @@ public final class TargetHealthElement implements HudElement {
    }
 
    private void drawEquipment(int x, int width) {
-      int y = baseHeight();
-      if (TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance) {
-         Render.roundRect(x + 2, y + 1, width - 4, 31, 3.0F, 0x99101822);
-         if (TargetHealthMod.settings.showHeldItem && heldItem != null) {
-            Render.item(heldItem, x + 5, y + 4, true);
-            int labelX = x + 25;
-            int rightSpace = TargetHealthMod.settings.showDistance ? Render.textWidth(distanceText) + 13 : 5;
-            Render.text(Render.trim(heldName, Math.max(12, width - (labelX - x) - rightSpace)),
-                    labelX, y + 3, 0xFFFFFFFF, true);
-            Render.text(Render.trim(heldDurability, Math.max(16, width - (labelX - x) - rightSpace)),
-                    labelX, y + 16, 0xFFB7C5D4, false);
-         } else if (TargetHealthMod.settings.showHeldItem) {
-            Render.text("Mão: vazia", x + 6, y + 8, 0xFFB7C5D4, false);
-         }
-         if (TargetHealthMod.settings.showDistance && !distanceText.isEmpty()) {
-            Render.text("Dist. " + distanceText, x + width - Render.textWidth("Dist. " + distanceText) - 6,
-                    y + 4, 0xFFFFDA80, true);
-         }
-      }
+      int start = x + (width - 210) / 2;
       if (TargetHealthMod.settings.showArmorDurability) {
-         int armorY = y + (TargetHealthMod.settings.showHeldItem || TargetHealthMod.settings.showDistance ? 34 : 1);
-         Render.roundRect(x + 2, armorY, width - 4, 76, 3.0F, 0x99101822);
-         Render.text("SET", x + 6, armorY + 2, 0xFF8FA4B8, true);
-         String defense = "DEFESA " + armorPoints;
-         Render.text(defense, x + width - Render.textWidth(defense) - 6, armorY + 2, 0xFFFFDA80, true);
          for (int i = 0; i < armor.length; i++) {
-            int rowY = armorY + 14 + i * 15;
-            Object stack = armor[i];
-            if (stack != null) {
-               Render.item(stack, x + 6, rowY - 2, true);
-               String line = ARMOR_LABELS[i] + " " + safeStackName(stack) + " · " + durability(stack);
-               Render.text(Render.trim(line, width - 32), x + 27, rowY, 0xFFB7C5D4, false);
-            } else {
-               Render.text(ARMOR_LABELS[i], x + 8, rowY, 0xFF728194, true);
-               Render.text("Vazio · —", x + 40, rowY, 0xFF728194, false);
-            }
+            drawItemCell(armor[i], start + i * 42, 31);
          }
       }
-   }
-
-   private static float ratio(float value, float max) {
-      return Math.max(0.0F, Math.min(value / Math.max(1.0F, max), 1.0F));
-   }
-
-   private static String format(float value) {
-      return value == Math.round(value) ? Integer.toString(Math.round(value)) : String.format(Locale.ROOT, "%.1f", value);
-   }
-
-   private static int template() {
-      return Math.max(0, Math.min(TargetHealthMod.settings.templateIndex, 3));
-   }
-
-   private static double range() {
-      int index = TargetHealthMod.settings.rangeIndex;
-      return RANGES[Math.max(0, Math.min(index, RANGES.length - 1))];
-   }
-
-   private static int backgroundColor() {
-      int index = Math.max(0, Math.min(TargetHealthMod.settings.opacityIndex, OPACITIES.length - 1));
-      return OPACITIES[index] << 24 | 0x101721;
-   }
-
-   private static int barColor(float percent) {
-      if (!TargetHealthMod.settings.dynamicHealthColor) {
-         return 0xFF000000 | Option.rgb(TargetHealthMod.settings.healthColor);
+      if (TargetHealthMod.settings.showHeldItem) {
+         int handX = TargetHealthMod.settings.showArmorDurability ? start + 168 : x + (width - 42) / 2;
+         drawItemCell(heldItem, handX, 31);
       }
+   }
+
+   private void drawItemCell(Object stack, int x, int y) {
+      if (stack == null) {
+         Render.text("—", x + 15, y + 19, 0xFF728194, false);
+         return;
+      }
+      Render.item(stack, x + 13, y, true);
+      Render.text(Render.trim(durability(stack), 40), x + 1, y + 19, 0xFFB7C5D4, false);
+   }
+
+   private static float ratio(float value, float max) { return Math.max(0.0F, Math.min(value / Math.max(1.0F, max), 1.0F)); }
+   private static String format(float value) { return value == Math.round(value) ? Integer.toString(Math.round(value)) : String.format(Locale.ROOT, "%.1f", value); }
+   private static int template() { return Math.max(0, Math.min(TargetHealthMod.settings.templateIndex, 3)); }
+   private static double range() { int i = TargetHealthMod.settings.rangeIndex; return RANGES[Math.max(0, Math.min(i, RANGES.length - 1))]; }
+   private static int backgroundColor() { int i = Math.max(0, Math.min(TargetHealthMod.settings.opacityIndex, OPACITIES.length - 1)); return OPACITIES[i] << 24 | 0x101721; }
+   private static int barColor(float percent) {
+      if (!TargetHealthMod.settings.dynamicHealthColor) return 0xFF000000 | Option.rgb(TargetHealthMod.settings.healthColor);
       if (percent > 0.5F) return 0xFF45B85A;
       if (percent > 0.25F) return 0xFFE0A93B;
       return 0xFFCF4848;
    }
-
-   public HudPlacement defaultPlacement() {
-      return new HudPlacement(1, 1, 0, 28, 1.0F, true, false);
-   }
+   public HudPlacement defaultPlacement() { return new HudPlacement(1, 1, 0, 28, 1.0F, true, false); }
 }

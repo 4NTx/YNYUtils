@@ -14,8 +14,8 @@ public final class AllyAttackFlowTest {
         relations.put(group, Relation.GROUP);
         relations.put(ally, Relation.ALLY);
         relations.put(enemy, Relation.ENEMY);
-        check(HitThroughAllies.keepOriginalAttack(true, Relation.ALLY, true), "successful ally roll keeps vanilla click");
-        check(!HitThroughAllies.keepOriginalAttack(true, Relation.ALLY, false), "failed ally roll redirects");
+        check(HitThroughAllies.keepOriginalAttack(true, Relation.ALLY, true), "ally hit with positive roll (50% chance)");
+        check(!HitThroughAllies.keepOriginalAttack(true, Relation.ALLY, false), "ally not hit with negative roll (50% chance)");
         check(!HitThroughAllies.keepOriginalAttack(true, Relation.GROUP, true), "same clan never hit even with positive roll");
         check(!HitThroughAllies.keepOriginalAttack(true, Relation.GROUP, false), "same clan never hit with negative roll");
         check(!HitThroughAllies.keepOriginalAttack(false, Relation.ALLY, true), "inactive mode never redirects");
@@ -57,6 +57,15 @@ public final class AllyAttackFlowTest {
         check(HitThroughAllies.firstHostileBeforeBlock(neutralRay, relations::get) == neutral,
                 "neutral target behind ally is treated as attackable target");
 
+        // Out-of-order distance sorting verification in crowds/wars
+        Ray outOfOrder = new Ray(Arrays.asList(new Hit(enemy2, 4.0, 0, 0, 0), new Hit(ally, 1.0, 0, 0, 0), new Hit(enemy, 2.0, 0, 0, 0)), 3.0, 3.0);
+        check(HitThroughAllies.firstHostileBeforeBlock(outOfOrder, relations::get) == enemy,
+                "out-of-order hits are sorted by distance so closest enemy is picked and wall does not prematurely discard closer targets");
+
+        Ray closerEnemyFirst = new Ray(Arrays.asList(new Hit(enemy2, 2.8, 0, 0, 0), new Hit(enemy, 1.5, 0, 0, 0)), 4.0, 4.0);
+        check(HitThroughAllies.firstHostileBeforeBlock(closerEnemyFirst, relations::get) == enemy,
+                "closest enemy is selected even if unsorted in raycast hits list");
+
         // Statistical distribution verification on live allowClickedAlly instance
         HitThroughAllies hta = new HitThroughAllies(() -> true, () -> false);
         check(!hta.allowClickedAlly(null), "null entity cannot be allowed");
@@ -72,9 +81,8 @@ public final class AllyAttackFlowTest {
             if (HitThroughAllies.keepOriginalAttack(true, Relation.ENEMY, roll)) enemyHits++;
         }
         check(groupHits == 0, "GROUP must never be hit (0% chance)");
+        check(allyHits > 700 && allyHits < 1300, "ALLY must have ~50% hit chance (got " + allyHits + "/" + totalRolls + ")");
         check(enemyHits == 0, "keepOriginalAttack must not trigger on ENEMY");
-        double allyRate = (double) allyHits / totalRolls;
-        check(allyRate >= 0.44 && allyRate <= 0.56, "ALLY hit rate must be centered at 50% (got " + allyRate + ")");
 
         System.out.println("PASS: ally attack flow (verified 0% group, ~50% ally [" + allyHits + "/" + totalRolls + "], 100% direct enemy, walls, chains)");
     }

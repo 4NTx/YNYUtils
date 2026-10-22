@@ -1,497 +1,336 @@
 package com.yny.utils;
 
-import com.yny.targethealth.TargetHealthElement;
-import com.yny.targethealth.TargetHealthMod;
 import com.yny.utils.config.YNYConfig;
 import com.yny.utils.core.ToggleKey;
-import com.yny.utils.modules.clanping.ClanPing;
-import com.yny.utils.modules.player.AutoArmor;
-import com.yny.utils.modules.player.ArmorThreshold;
-import com.yny.utils.modules.player.ArmorPickupOptions;
-import com.yny.utils.modules.player.ArmorPickupFilter;
-import com.yny.utils.modules.player.AutoConsumables;
-import com.yny.utils.modules.player.AutoProtect;
-import com.yny.utils.modules.player.AutoProtectOptions;
-import com.yny.utils.modules.player.InventoryMove;
-import com.yny.utils.modules.pvp.AllyGroundMarker;
-import com.yny.utils.modules.pvp.HitThroughAllies;
 import com.yny.utils.modules.pvp.KnockbackControl;
-import com.yny.utils.modules.pvp.KnockbackJumpReset;
-import com.yny.utils.modules.pvp.KnockbackShiftReset;
+import com.yny.utils.modules.player.AutoArmor;
+import com.yny.utils.modules.player.AutoConsumables;
 import com.yny.utils.ui.PvpStatusHud;
+import com.yny.targethealth.TargetHealthElement;
+import com.yny.targethealth.TargetHealthMod;
+
 import dev.xavier.stein.loader.api.Hud;
-import dev.xavier.stein.loader.api.Keys;
 import dev.xavier.stein.loader.api.ModConfig;
 import dev.xavier.stein.loader.api.ModContext;
 import dev.xavier.stein.loader.api.Option;
 import dev.xavier.stein.loader.api.Page;
 import dev.xavier.stein.loader.api.SteinMod;
-import dev.xavier.stein.loader.api.Targeting;
 
+/** Entry point do YNYUtils para o Stein Loader. */
 public final class YNYUtils implements SteinMod {
-   private static volatile YNYConfig config = new YNYConfig();
-   private final ModContext context = ModContext.of(this);
-   private final ModConfig<YNYConfig> configStore = this.context.config(YNYConfig.class);
-   private final KnockbackShiftReset knockbackShiftReset = new KnockbackShiftReset(() -> config.knockbackShiftReset && !config.knockbackJumpReset);
-   private final KnockbackJumpReset knockbackJumpReset = new KnockbackJumpReset(() -> config.knockbackJumpReset);
-   private final KnockbackControl knockbackControl = new KnockbackControl(
-      () -> true,
-      () -> 92,
-      () -> false,
-      () -> config.pvpDiagnosticsEnabled,
-      (var1, var2) -> {
-         this.knockbackShiftReset.onVelocity(var1, var2);
-         this.knockbackJumpReset.onVelocity(var1, var2);
-      },
-      () -> {
-         this.knockbackShiftReset.onVelocityApplied();
-         this.knockbackJumpReset.onVelocityApplied();
-      }
-   );
-   private final HitThroughAllies hitThroughAllies = new HitThroughAllies(() -> config.hitThroughAlliesEnabled, () -> config.pvpDiagnosticsEnabled);
-   private final AllyGroundMarker allyGroundMarker = new AllyGroundMarker();
-   private final PvpStatusHud pvpStatusHud = new PvpStatusHud(
-      () -> config.knockbackStatusHudEnabled, () -> config.autoArmorStatusHudEnabled, () -> config.autoConsumablesStatusHudEnabled
-   );
-   private final ToggleKey knockbackToggleKey = new ToggleKey();
-   private final ToggleKey shiftResetToggleKey = new ToggleKey();
-   private final ToggleKey jumpResetToggleKey = new ToggleKey();
-   private final ToggleKey autoArmorToggleKey = new ToggleKey();
-   private final ToggleKey autoConsumablesToggleKey = new ToggleKey();
-   private final AutoArmor autoArmor = new AutoArmor(
-      () -> config.autoArmorEnabled,
-      () -> config.autoArmorPreventiveThreshold,
-      () -> config.autoArmorPreferredMaterial,
-      () -> config.autoArmorIgnoreUnenchanted,
-      () -> config.autoArmorUseDamagedReserves,
-      () -> config.autoArmorDropUnenchantedOld,
-      () -> config.autoArmorDropStuckOld,
-      this.pvpStatusHud::showAutoArmorStatus
-   );
-   private final AutoConsumables autoConsumables = new AutoConsumables(
-      () -> config.autoConsumablesEnabled,
-      () -> config.goldenAppleMode,
-      () -> config.goldenApplePreference,
-      () -> config.potionMode,
-      () -> config.autoStrengthPotion,
-      () -> config.autoSpeedPotion,
-      () -> config.potionRefreshSeconds,
-      () -> config.consumableCombatSeconds,
-      () -> config.goldenAppleCooldownSeconds,
-      () -> config.pvpDiagnosticsEnabled,
-      this.pvpStatusHud::showAutoConsumablesStatus
-   );
-   private final InventoryMove inventoryMove = new InventoryMove(
-      () -> config.inventoryMoveEnabled, () -> true, this.autoConsumables::isControllingUseKey
-   );
-   private final TargetHealthElement targetHealthElement = new TargetHealthElement();
-   private final ClanPing clanPing = new ClanPing(
-      this.context,
-      () -> config.clanPingEnabled,
-      () -> config.clanPingHudEnabled,
-      () -> config.clanPingLocationSeconds,
-      () -> config.clanPingEnemySeconds,
-      () -> config.clanPingTargetRange,
-      () -> config.clanPingSound,
-      () -> config.clanPingDistantIndicator,
-      () -> config.clanPingCooldownSeconds,
-      () -> config.clanPingMarkerScale
-   );
 
-   public void afterStartGame() {
-      config = (YNYConfig)this.configStore.get();
-      config.sanitize();
-      TargetHealthMod.initialize();
-      Hud.register(this.pvpStatusHud);
-      Hud.register(this.targetHealthElement);
-      Hud.register(this.clanPing.hud());
-      this.clanPing.start();
-   }
+    public static volatile YNYUtils instance;
+    private static volatile YNYConfig config = new YNYConfig();
+    private final ModContext context = ModContext.of(this);
+    private final ModConfig<YNYConfig> configStore = context.config(YNYConfig.class);
 
-   public void onTickEnd() {
-      this.knockbackControl.installIfPending();
-      this.knockbackControl.onTickEnd();
-      this.knockbackShiftReset.onTickEnd();
-      this.knockbackJumpReset.onTickEnd();
-      this.updateToggleKey();
-      ArmorPickupFilter.runAutoArmor(this.autoArmor, config);
-      this.autoConsumables.onTickEnd();
-      this.inventoryMove.onTickEnd();
-      AutoProtect.onTick(config, this.autoConsumables.isControllingUseKey());
-      this.targetHealthElement.updateDistantTarget();
-      this.targetHealthElement.updateTarget();
-      this.clanPing.onTickEnd();
-   }
+    public YNYUtils() {
+        instance = this;
+    }
 
-   public void onShutdown() {
-      AutoProtect.reset();
-      this.knockbackControl.reset();
-      this.knockbackShiftReset.reset();
-      this.knockbackJumpReset.reset();
-      this.configStore.save();
-      TargetHealthMod.save();
-      this.clanPing.stop();
-   }
+    public static YNYConfig getConfig() {
+        return config;
+    }
 
-   public void onJoinGame() {
-      AutoProtect.reset();
-      com.yny.utils.modules.StartupAudit.log(config);
-      this.knockbackControl.requestInstallation();
-      this.knockbackShiftReset.reset();
-      this.knockbackJumpReset.reset();
-      this.autoArmor.resetSession();
-      ArmorPickupFilter.reset();
-      this.autoConsumables.resetSession();
-      this.clanPing.onJoinGame();
-   }
+    public static ModConfig<YNYConfig> getConfigStore() {
+        return instance != null ? instance.configStore : null;
+    }
 
-   public void onDisconnected(String var1, String var2) {
-      AutoProtect.reset();
-      this.knockbackControl.onDisconnected();
-      this.knockbackShiftReset.reset();
-      this.knockbackJumpReset.reset();
-      ArmorPickupFilter.reset();
-      this.autoConsumables.resetSession();
-      this.clanPing.onDisconnected();
-   }
+    private final KnockbackControl knockbackControl = new KnockbackControl(
+            () -> config.knockbackEnabled, () -> config.knockbackPercent,
+            () -> config.knockbackPreserveVertical, () -> config.knockbackJumpReset,
+            () -> config.pvpDiagnosticsEnabled);
+    private final PvpStatusHud pvpStatusHud = new PvpStatusHud(
+            () -> config.knockbackStatusHudEnabled,
+            () -> config.autoArmorStatusHudEnabled, () -> config.autoConsumablesStatusHudEnabled);
+    private final ToggleKey knockbackToggleKey = new ToggleKey();
+    private final ToggleKey autoArmorToggleKey = new ToggleKey();
+    private final ToggleKey autoConsumablesToggleKey = new ToggleKey();
+    private final AutoArmor autoArmor = new AutoArmor(() -> config.autoArmorEnabled,
+            () -> com.yny.utils.modules.player.ArmorThreshold.normalize(config.autoArmorPreventiveThreshold),
+            () -> config.autoArmorPreferredMaterial,
+            () -> config.autoArmorIgnoreUnenchanted,
+            () -> config.autoArmorUseDamagedReserves,
+            () -> config.autoArmorDropUnenchantedOld, () -> config.autoArmorDropStuckOld,
+            pvpStatusHud::showAutoArmorStatus);
+    private final AutoConsumables autoConsumables = new AutoConsumables(() -> config.autoConsumablesEnabled,
+            () -> config.goldenAppleMode, () -> config.goldenApplePreference, () -> config.potionMode,
+            () -> config.autoStrengthPotion, () -> config.autoSpeedPotion,
+            () -> config.potionRefreshSeconds, () -> config.consumableCombatSeconds,
+            () -> config.goldenAppleCooldownSeconds, () -> config.pvpDiagnosticsEnabled,
+            pvpStatusHud::showAutoConsumablesStatus);
+    private final TargetHealthElement targetHealthElement = new TargetHealthElement();
+    @Override
+    public void afterStartGame() {
+        config = configStore.get();
+        config.sanitize();
+        com.yny.utils.core.DebugLog.setEnabled(config.pvpDiagnosticsEnabled);
+        TargetHealthMod.initialize();
+        Hud.register(pvpStatusHud);
+        Hud.register(targetHealthElement);
+        com.yny.utils.telemetry.TelemetryBridge.afterStartGame();
+    }
 
-   public void onPage(Page var1) {
-      AutoProtectOptions.add(var1, config, this.configStore);
-      var1.title("YNYUtils")
-         .icon("combat")
-         .section("Ataque e aliados")
-         .option(Option.toggle("50% no primeiro aliado; grupo/clã sempre ignorado", () -> config.hitThroughAlliesEnabled, var1x -> {
-            config.hitThroughAlliesEnabled = var1x;
-            this.markConfigChanged();
-         }))
-         .section("Knockback: escolha Shift Reset ou Jump Reset")
-         .option(Option.toggle("Usar Shift Reset (desativa Jump Reset)", () -> config.knockbackShiftReset, var1x -> {
-            config.knockbackShiftReset = var1x;
-            if (var1x) {
-               config.knockbackJumpReset = false;
-            }
+    @Override
+    public void onTickEnd() {
+        knockbackControl.installIfPending();
+        knockbackControl.onTickEnd();
+        updateToggleKey();
+        autoArmor.onTickEnd();
+        autoConsumables.onTickEnd();
+        targetHealthElement.updateDistantTarget();
+        targetHealthElement.updateTarget();
+        com.yny.utils.modules.pvp.MobAura.onTickEnd();
+        com.yny.utils.modules.player.DropProtection.enforce();
+    }
 
-            this.pvpStatusHud.showReset(false, var1x);
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Usar Jump Reset (desativa Shift Reset)", () -> config.knockbackJumpReset, var1x -> {
-            config.knockbackJumpReset = var1x;
-            if (var1x) {
-               config.knockbackShiftReset = false;
-            }
+    @Override
+    public void onShutdown() {
+        knockbackControl.reset();
+        com.yny.utils.modules.pvp.MobAura.reset();
+        configStore.save();
+        TargetHealthMod.save();
+        com.yny.utils.telemetry.TelemetryBridge.onShutdown();
+    }
 
-            this.pvpStatusHud.showReset(true, var1x);
-            this.markConfigChanged();
-         }))
-         .option(Option.key("Tecla para alternar Shift Reset", () -> config.knockbackShiftResetToggleKey, var1x -> {
-            config.knockbackShiftResetToggleKey = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.key("Tecla para alternar Jump Reset", () -> config.knockbackJumpResetToggleKey, var1x -> {
-            config.knockbackJumpResetToggleKey = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Registrar detalhes de combate e consumíveis", () -> config.pvpDiagnosticsEnabled, var1x -> {
-            config.pvpDiagnosticsEnabled = var1x;
-            this.markConfigChanged();
-         }))
-         .section("Armadura e inventário")
-         .option(Option.toggle("Ativar troca automática de armadura", () -> config.autoArmorEnabled, var1x -> {
-            config.autoArmorEnabled = var1x;
-            this.pvpStatusHud.showAutoArmor(var1x);
-            this.markConfigChanged();
-         }))
-         .option(Option.key("Tecla para alternar Auto Armor", () -> config.autoArmorToggleKey, var1x -> {
-            config.autoArmorToggleKey = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Mostrar status do Auto Armor na HUD", () -> config.autoArmorStatusHudEnabled, var1x -> {
-            config.autoArmorStatusHudEnabled = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Mover-se enquanto o inventário está aberto", () -> config.inventoryMoveEnabled, var1x -> {
-            config.inventoryMoveEnabled = var1x;
-            this.markConfigChanged();
-         }))
-         .option(
-            Option.cycle(
-               "Material preferido para reposição",
-               new String[]{"Melhor disponível", "Diamante", "Ferro", "Malha", "Ouro", "Couro"},
-               () -> config.autoArmorPreferredMaterial,
-               var1x -> {
-                  config.autoArmorPreferredMaterial = var1x;
-                  this.markConfigChanged();
-               }
-            )
-         )
-         .option(Option.slider("Repor armadura abaixo desta durabilidade", 0.0, 8.0, 1.0, () -> ArmorThreshold.toSlider(config.autoArmorPreventiveThreshold), var1x -> {
-            config.autoArmorPreventiveThreshold = ArmorThreshold.fromSlider((int)var1x);
-            this.markConfigChanged();
-         }, var0 -> (int)var0 == 0 ? "Só quando quebrar" : ArmorThreshold.fromSlider((int)var0) + "% restante"))
-         .option(Option.toggle("Usar somente reservas encantadas", () -> config.autoArmorIgnoreUnenchanted, var1x -> {
-            config.autoArmorIgnoreUnenchanted = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Aceitar reserva danificada se a peça quebrar", () -> config.autoArmorUseDamagedReserves, var1x -> {
-            config.autoArmorUseDamagedReserves = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Descartar peça antiga sem encantamentos após confirmar troca", () -> config.autoArmorDropUnenchantedOld, var1x -> {
-            config.autoArmorDropUnenchantedOld = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Último recurso: descartar peça antiga presa no cursor", () -> config.autoArmorDropStuckOld, var1x -> {
-            config.autoArmorDropStuckOld = var1x;
-            this.markConfigChanged();
-         }));
-      ArmorPickupOptions.add(var1, config, this.configStore);
-      var1.section("Consumíveis: maçãs e poções")
-         .option(Option.toggle("Ativar uso automático de maçãs e poções", () -> config.autoConsumablesEnabled, var1x -> {
-            config.autoConsumablesEnabled = var1x;
-            this.pvpStatusHud.showAutoConsumables(var1x);
-            this.markConfigChanged();
-         }))
-         .option(Option.key("Tecla para alternar Auto Consumíveis", () -> config.autoConsumablesToggleKey, var1x -> {
-            config.autoConsumablesToggleKey = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Mostrar status dos consumíveis na HUD", () -> config.autoConsumablesStatusHudEnabled, var1x -> {
-            config.autoConsumablesStatusHudEnabled = var1x;
-            this.markConfigChanged();
-         }))
-         .option(
-            Option.cycle(
-               "Quando usar maçãs douradas",
-               new String[]{"Desativada", "Econômico: após dano, quando o efeito acabar", "Combate: renovar efeito perto do fim"},
-               () -> config.goldenAppleMode,
-               var1x -> {
-                  config.goldenAppleMode = var1x;
-                  this.markConfigChanged();
-               }
-            )
-         )
-         .option(
-            Option.cycle("Qual maçã escolher", new String[]{"Priorizar encantada", "Só encantada", "Só normal"}, () -> config.goldenApplePreference, var1x -> {
-               config.goldenApplePreference = var1x;
-               this.markConfigChanged();
-            })
-         )
-         .option(Option.slider("Pausa mínima entre usos de maçã", 1.0, 30.0, 1.0, () -> config.goldenAppleCooldownSeconds, var1x -> {
-            config.goldenAppleCooldownSeconds = (int)var1x;
-            this.markConfigChanged();
-         }, var0 -> (int)var0 + " s"))
-         .option(
-            Option.cycle(
-               "Quando usar poções de força/velocidade",
-               new String[]{"Desativadas", "Econômico: após dano, quando o efeito acabar", "Combate: renovar efeito perto do fim"},
-               () -> config.potionMode,
-               var1x -> {
-                  config.potionMode = var1x;
-                  this.markConfigChanged();
-               }
-            )
-         )
-         .option(Option.toggle("Permitir poção de força", () -> config.autoStrengthPotion, var1x -> {
-            config.autoStrengthPotion = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Permitir poção de velocidade", () -> config.autoSpeedPotion, var1x -> {
-            config.autoSpeedPotion = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.slider("Combate: renovar efeito quando restarem", 1.0, 10.0, 1.0, () -> config.potionRefreshSeconds, var1x -> {
-            config.potionRefreshSeconds = (int)var1x;
-            this.markConfigChanged();
-         }, var0 -> (int)var0 + " s"))
-         .option(Option.slider("Combate: janela após último hit", 1.0, 15.0, 1.0, () -> config.consumableCombatSeconds, var1x -> {
-            config.consumableCombatSeconds = (int)var1x;
-            this.markConfigChanged();
-         }, var0 -> (int)var0 + " s"));
-      TargetHealthMod.addOptions(var1);
-      var1.section("Clan Ping: marcar e localizar")
-         .option(Option.toggle("Ativar Clan Ping: marcar e localizar", () -> config.clanPingEnabled, var1x -> {
-            config.clanPingEnabled = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.key("Atalho: marcar local", () -> config.clanPingLocationKey, var1x -> {
-            config.clanPingLocationKey = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.key("Atalho: marcar inimigo", () -> config.clanPingEnemyKey, var1x -> {
-            config.clanPingEnemyKey = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Usar clique do meio para ping rápido", () -> config.clanPingMiddleClick, var1x -> {
-            config.clanPingMiddleClick = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Tocar som ao receber ping: marcar e localizar", () -> config.clanPingSound, var1x -> {
-            config.clanPingSound = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Exibir direção e distância do ping", () -> config.clanPingDistantIndicator, var1x -> {
-            config.clanPingDistantIndicator = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.key("Atalho: remover meu ping", () -> config.clanPingCancelKey, var1x -> {
-            config.clanPingCancelKey = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.toggle("Exibir cartão do Clan Ping: marcar e localizar", () -> config.clanPingHudEnabled, var1x -> {
-            config.clanPingHudEnabled = var1x;
-            this.markConfigChanged();
-         }))
-         .option(Option.slider("Duração do ping de local", 10.0, 180.0, 5.0, () -> config.clanPingLocationSeconds, var1x -> {
-            config.clanPingLocationSeconds = (int)var1x;
-            this.markConfigChanged();
-         }, var0 -> (int)var0 + " s"))
-         .option(Option.slider("Duração do ping de inimigo", 10.0, 180.0, 5.0, () -> config.clanPingEnemySeconds, var1x -> {
-            config.clanPingEnemySeconds = (int)var1x;
-            this.markConfigChanged();
-         }, var0 -> (int)var0 + " s"))
-         .option(Option.slider("Alcance máximo da busca visual do Clan Ping: marcar e localizar", 8.0, 64.0, 8.0, () -> config.clanPingTargetRange, var1x -> {
-            config.clanPingTargetRange = (int)var1x;
-            this.markConfigChanged();
-         }, var0 -> (int)var0 + " blocos"))
-         .option(Option.slider("Pausa mínima entre pings", 1.0, 5.0, 1.0, () -> config.clanPingCooldownSeconds, var1x -> {
-            config.clanPingCooldownSeconds = (int)var1x;
-            this.markConfigChanged();
-         }, var0 -> (int)var0 + " s"))
-         .option(Option.slider("Tamanho dos marcadores", 0.75, 2.0, 0.25, () -> config.clanPingMarkerScale, var1x -> {
-            config.clanPingMarkerScale = (float)var1x;
-            this.markConfigChanged();
-         }, var0 -> String.format("%.2fx", var0)))
-         .option(Option.action("Token para enviar pings do clã", "Configurar token", this.clanPing::openTokenScreen))
-         .option(Option.action("Estado da conexão e envio", "Ver no chat", this.clanPing::showStatus));
-   }
+    @Override
+    public void onJoinGame() {
+        com.yny.utils.modules.player.AutoProtect.reset();
+        com.yny.utils.modules.player.PriorityBus.reset();
+        knockbackControl.requestInstallation();
+        autoArmor.resetSession();
+        autoConsumables.resetSession();
+        com.yny.utils.modules.player.ArmorPickupFilter.reset();
+        com.yny.utils.modules.pvp.FocusMode.reset();
+        com.yny.utils.ui.BrokenArmorHud.reset();
+        com.yny.utils.telemetry.TelemetryBridge.onJoinGame();
+    }
 
-   public void onModelsReloaded() {
-      this.pvpStatusHud.invalidateFontMetrics();
-   }
+    @Override
+    public void onDisconnected(String title, String reason) {
+        knockbackControl.onDisconnected();
+        autoConsumables.resetSession();
+        com.yny.utils.telemetry.TelemetryBridge.onDisconnected();
+    }
 
-   public void onRenderWorld(float var1) {
-      if (com.yny.utils.modules.clanping.GfxWorldMarkers.render(this.clanPing, var1)) return;
-      this.clanPing.renderWorld(var1);
-      this.allyGroundMarker.renderWorld(var1);
-   }
+    @Override
+    public void onPage(Page page) {
+        page.title("YNYUtils")
+                .icon("combat")
+                .section("PvP")
+                .option(Option.toggle("Reduzir Knockback", () -> config.knockbackEnabled, value -> {
+                    config.knockbackEnabled = value;
+                    pvpStatusHud.showKnockback(value);
+                    markConfigChanged();
+                }))
+                .option(Option.slider("Velocidade recebida", 93, 100, 1, () -> config.knockbackPercent, value -> {
+                    config.knockbackPercent = (int) value;
+                    markConfigChanged();
+                }, value -> (int) value + "% (redução: " + (100 - (int) value) + "%)"))
+                .option(Option.toggle("Manter impulso vertical vanilla", () -> config.knockbackPreserveVertical,
+                        value -> {
+                            config.knockbackPreserveVertical = value;
+                            markConfigChanged();
+                        }))
+                .option(Option.key("Tecla para alternar redução", () -> config.knockbackToggleKey, value -> {
+                    config.knockbackToggleKey = value;
+                    markConfigChanged();
+                }))
+                .option(Option.toggle("Mostrar notificação do KB", () -> config.knockbackStatusHudEnabled, value -> {
+                    config.knockbackStatusHudEnabled = value;
+                    markConfigChanged();
+                }))
+                .section("Jump Reset")
+                .option(Option.toggle("Pulinho ao receber KB no chão (experimental)",
+                        () -> config.knockbackJumpReset, value -> {
+                            config.knockbackJumpReset = value;
+                            markConfigChanged();
+                        }))
+                .option(Option.toggle("Logs detalhados KB/Capira/Pot",
+                        () -> config.pvpDiagnosticsEnabled, value -> {
+                            config.pvpDiagnosticsEnabled = value;
+                            com.yny.utils.core.DebugLog.setEnabled(value);
+                            markConfigChanged();
+                        }))
+                .section("Auto Armor")
+                .option(Option.toggle("Ligar/desligar Auto Armor", () -> config.autoArmorEnabled, value -> {
+                    config.autoArmorEnabled = value;
+                    pvpStatusHud.showAutoArmor(value);
+                    markConfigChanged();
+                }))
+                .option(Option.key("Tecla para alternar Auto Armor", () -> config.autoArmorToggleKey, value -> {
+                    config.autoArmorToggleKey = value;
+                    markConfigChanged();
+                }))
+                .option(Option.toggle("Mostrar notificação do Auto Armor", () -> config.autoArmorStatusHudEnabled,
+                        value -> {
+                            config.autoArmorStatusHudEnabled = value;
+                            markConfigChanged();
+                }))
+                .option(Option.cycle("Material preferido para reposição", new String[] {
+                        "Melhor disponível", "Diamante", "Ferro", "Malha", "Ouro", "Couro"
+                }, () -> config.autoArmorPreferredMaterial, value -> {
+                    config.autoArmorPreferredMaterial = value;
+                    markConfigChanged();
+                }))
+                .option(Option.slider("Repor armadura abaixo desta durabilidade", 0, 7, 1,
+                        () -> com.yny.utils.modules.player.ArmorThreshold.toSlider(config.autoArmorPreventiveThreshold), value -> {
+                            config.autoArmorPreventiveThreshold = com.yny.utils.modules.player.ArmorThreshold.fromSlider((int) value);
+                            markConfigChanged();
+                        }, value -> (int) value == 0 ? "Só quando quebrar" : com.yny.utils.modules.player.ArmorThreshold.fromSlider((int) value) + "% restante"))
+                .option(Option.toggle("Usar somente reservas encantadas", () -> config.autoArmorIgnoreUnenchanted,
+                        value -> {
+                            config.autoArmorIgnoreUnenchanted = value;
+                            markConfigChanged();
+                        }))
+                .option(Option.toggle("Aceitar reserva danificada se a peça quebrar",
+                        () -> config.autoArmorUseDamagedReserves, value -> {
+                            config.autoArmorUseDamagedReserves = value;
+                            markConfigChanged();
+                        }))
+                .option(Option.toggle("Descartar peça antiga sem encantamentos após confirmar troca",
+                        () -> config.autoArmorDropUnenchantedOld, value -> {
+                            config.autoArmorDropUnenchantedOld = value;
+                            markConfigChanged();
+                }))
+                .option(Option.toggle("Último recurso: descartar peça antiga presa no cursor",
+                        () -> config.autoArmorDropStuckOld, value -> {
+                            config.autoArmorDropStuckOld = value;
+                            markConfigChanged();
+                }));
+        page.section("Auto Consumíveis")
+                .option(Option.toggle("Ligar/desligar Auto Consumíveis", () -> config.autoConsumablesEnabled,
+                        value -> {
+                            config.autoConsumablesEnabled = value;
+                            pvpStatusHud.showAutoConsumables(value);
+                            markConfigChanged();
+                        }))
+                .option(Option.key("Tecla para alternar Auto Consumíveis", () -> config.autoConsumablesToggleKey,
+                        value -> {
+                            config.autoConsumablesToggleKey = value;
+                            markConfigChanged();
+                        }))
+                .option(Option.toggle("Mostrar notificação na HUD", () -> config.autoConsumablesStatusHudEnabled,
+                        value -> {
+                            config.autoConsumablesStatusHudEnabled = value;
+                            markConfigChanged();
+                        }))
+                .option(Option.cycle("Maçã dourada", new String[] {
+                        "Desativada", "Econômico: após dano, quando o efeito acabar",
+                        "Combate: renovar efeito perto do fim"
+                }, () -> config.goldenAppleMode, value -> {
+                    config.goldenAppleMode = value;
+                    markConfigChanged();
+                }))
+                .option(Option.cycle("Preferência de maçã", new String[] {
+                        "Priorizar encantada", "Só encantada", "Só normal"
+                }, () -> config.goldenApplePreference, value -> {
+                    config.goldenApplePreference = value;
+                    markConfigChanged();
+                }))
+                .option(Option.slider("Pausa mínima entre usos de maçã", 1, 30, 1,
+                        () -> config.goldenAppleCooldownSeconds, value -> {
+                            config.goldenAppleCooldownSeconds = (int) value;
+                            markConfigChanged();
+                        }, value -> (int) value + " s"))
+                .option(Option.cycle("Poções de força/velocidade", new String[] {
+                        "Desativadas", "Econômico: após dano, quando o efeito acabar",
+                        "Combate: renovar efeito perto do fim"
+                }, () -> config.potionMode, value -> {
+                    config.potionMode = value;
+                    markConfigChanged();
+                }))
+                .option(Option.toggle("Permitir poção de força", () -> config.autoStrengthPotion, value -> {
+                    config.autoStrengthPotion = value;
+                    markConfigChanged();
+                }))
+                .option(Option.toggle("Permitir poção de velocidade", () -> config.autoSpeedPotion, value -> {
+                    config.autoSpeedPotion = value;
+                    markConfigChanged();
+                }))
+                .option(Option.slider("Combate: renovar efeito quando restarem", 1, 10, 1,
+                        () -> config.potionRefreshSeconds, value -> {
+                            config.potionRefreshSeconds = (int) value;
+                            markConfigChanged();
+                        }, value -> (int) value + " s"))
+                .option(Option.slider("Combate: janela após último hit", 1, 15, 1,
+                        () -> config.consumableCombatSeconds, value -> {
+                            config.consumableCombatSeconds = (int) value;
+                            markConfigChanged();
+                        }, value -> (int) value + " s"));
+        TargetHealthMod.addOptions(page);
+        com.yny.utils.team.SteinCombat.addOptions(page);
+        com.yny.utils.telemetry.TelemetryBridge.addOptions(page);
+        com.yny.utils.modules.pvp.MobAura.addOptions(page);
+    }
 
-   public void onOverlayTop(float var1) {
-      this.clanPing.drawDistantIndicator();
-   }
+    @Override
+    public void onModelsReloaded() {
+        pvpStatusHud.invalidateFontMetrics();
+    }
 
-   public void onMouseInput() {
-      if (config.clanPingMiddleClick && Keys.mousePressed() && Keys.mouseButton() == 2) {
-         this.clanPing.createQuickPing();
-      }
-   }
+    @Override
+    public boolean onAttackEntity(Object target) {
+        autoConsumables.onAttack(target);
+        if (com.yny.utils.modules.pvp.FocusMode.onAttackEntity(target)) {
+            return true;
+        }
+        return false;
+    }
 
-   public boolean onAttackEntity(Object var1) {
-      if (this.hitThroughAllies.allowClickedAlly(var1)) {
-         this.autoConsumables.onAttack(var1);
-         return false;
-      }
-      if (this.hitThroughAllies.shouldCancel(var1)) {
-         Object var2 = this.hitThroughAllies.targetBehindAllies(var1);
-         if (var2 != null) {
-            this.autoConsumables.onAttack(var2);
-            Targeting.attack(var2);
-         }
+    @Override
+    public boolean onEntityHurt(Object entity) {
+        if (entity == dev.xavier.stein.loader.api.Entities.self()) {
+            autoConsumables.onHurt();
+            knockbackControl.onLocalHurt();
+        }
+        return false;
+    }
 
-         return true;
-      } else {
-         this.autoConsumables.onAttack(var1);
-         return false;
-      }
-   }
+    @Override
+    public void onHealthChanged(Object entity, float oldHealth, float newHealth, float oldAbsorption,
+            float newAbsorption) {
+        targetHealthElement.onHealthChanged(entity, oldHealth, newHealth, oldAbsorption, newAbsorption);
+        if (entity == dev.xavier.stein.loader.api.Entities.self()) {
+            autoConsumables.onHealthChanged(oldHealth, newHealth, oldAbsorption, newAbsorption);
+        }
+    }
 
-   public boolean onEntityHurt(Object var1) {
-      if (var1 == ave.A().h) {
-         this.autoConsumables.onHurt();
-      }
+    @Override
+    public void onSlotChanged(int windowId, int slot, Object stack) {
+        autoArmor.onSlotChanged(windowId, slot, stack);
+    }
 
-      return false;
-   }
+    @Override
+    public void onWindowItems(int windowId) {
+        autoArmor.onWindowItems(windowId);
+    }
 
-   public void onHealthChanged(Object var1, float var2, float var3, float var4, float var5) {
-      this.targetHealthElement.onHealthChanged(var1, var2, var3, var4, var5);
-      if (var1 == ave.A().h) {
-         this.autoConsumables.onHealthChanged(var2, var3, var4, var5);
-      }
-   }
+    private void updateToggleKey() {
+        if (knockbackToggleKey.wasPressed(config.knockbackToggleKey)) {
+            config.knockbackEnabled = !config.knockbackEnabled;
+            pvpStatusHud.showKnockback(config.knockbackEnabled);
+            markConfigChanged();
+        }
+        if (autoArmorToggleKey.wasPressed(config.autoArmorToggleKey)) {
+            config.autoArmorEnabled = !config.autoArmorEnabled;
+            pvpStatusHud.showAutoArmor(config.autoArmorEnabled);
+            markConfigChanged();
+        }
+        if (autoConsumablesToggleKey.wasPressed(config.autoConsumablesToggleKey)) {
+            config.autoConsumablesEnabled = !config.autoConsumablesEnabled;
+            pvpStatusHud.showAutoConsumables(config.autoConsumablesEnabled);
+            markConfigChanged();
+        }
+        com.yny.utils.modules.pvp.MobAura.updateToggleKey();
+        com.yny.utils.modules.pvp.FocusMode.updateToggleKey();
+    }
 
-   public void onSlotChanged(int var1, int var2, Object var3) {
-      this.autoArmor.onSlotChanged(var1, var2, var3);
-      ArmorPickupFilter.onSlotChanged(var1, var2, var3, config);
-   }
-
-   public void onWindowItems(int var1) {
-      this.autoArmor.onWindowItems(var1);
-      ArmorPickupFilter.onWindowItems(var1);
-   }
-
-   private void updateToggleKey() {
-      if (this.shiftResetToggleKey.wasPressed(config.knockbackShiftResetToggleKey)) {
-         config.knockbackShiftReset = !config.knockbackShiftReset;
-         if (config.knockbackShiftReset) {
-            config.knockbackJumpReset = false;
-         }
-
-         this.pvpStatusHud.showReset(false, config.knockbackShiftReset);
-         this.markConfigChanged();
-      }
-
-      if (this.jumpResetToggleKey.wasPressed(config.knockbackJumpResetToggleKey)) {
-         config.knockbackJumpReset = !config.knockbackJumpReset;
-         if (config.knockbackJumpReset) {
-            config.knockbackShiftReset = false;
-         }
-
-         this.pvpStatusHud.showReset(true, config.knockbackJumpReset);
-         this.markConfigChanged();
-      }
-
-      if (this.autoArmorToggleKey.wasPressed(config.autoArmorToggleKey)) {
-         config.autoArmorEnabled = !config.autoArmorEnabled;
-         this.pvpStatusHud.showAutoArmor(config.autoArmorEnabled);
-         this.markConfigChanged();
-      }
-
-      if (this.autoConsumablesToggleKey.wasPressed(config.autoConsumablesToggleKey)) {
-         config.autoConsumablesEnabled = !config.autoConsumablesEnabled;
-         this.pvpStatusHud.showAutoConsumables(config.autoConsumablesEnabled);
-         this.markConfigChanged();
-      }
-
-      if (this.clanPing.wasLocationPressed(config.clanPingLocationKey)) {
-         this.clanPing.createLocationFromCrosshair();
-      }
-
-      if (this.clanPing.wasEnemyPressed(config.clanPingEnemyKey)) {
-         this.clanPing.createEnemyFromCrosshair();
-      }
-
-      if (this.clanPing.wasCancelPressed(config.clanPingCancelKey)) {
-         this.clanPing.cancelOwnPing();
-      }
-
-      AutoProtect.checkToggleKey(config, this.configStore);
-   }
-
-   private void markConfigChanged() {
-      this.configStore.saveSoon();
-   }
-
-   public String onSendChat(String var1) {
-      return this.clanPing.onSendChat(var1);
-   }
-
-   public void onEntityDeath(Object var1) {
-      this.clanPing.onEntityDeath(var1);
-   }
+    /** O SDK agrupa mudanças rápidas e grava o JSON atomicamente. */
+    private void markConfigChanged() {
+        configStore.saveSoon();
+    }
 }
-
-
-
 
 
 

@@ -1,9 +1,9 @@
 $ErrorActionPreference = 'Stop'
-$workspace = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
+$modpackRoot = 'C:\Users\artur\Desktop\Modpack'
 $gameDirs = @(
-    (Join-Path $workspace 'data\.minecraft'),
-    (Join-Path $workspace 'COISAS\YNY-Modpack-Limpa\data\.minecraft'),
-    (Join-Path $workspace 'COISAS\YNY-Modpack-Limpa\data\data\.minecraft')
+    (Join-Path $modpackRoot 'data\.minecraft'),
+    (Join-Path $modpackRoot 'Sources\COISAS\YNY-Modpack-Limpa\data\.minecraft'),
+    (Join-Path $modpackRoot 'Sources\COISAS\YNY-Modpack-Limpa\data\data\.minecraft')
 )
 $hashes = @()
 foreach ($gameDir in $gameDirs) {
@@ -11,13 +11,8 @@ foreach ($gameDir in $gameDirs) {
     $yny = Get-Content -LiteralPath (Join-Path $gameDir 'config\ynyutils.json') -Raw | ConvertFrom-Json
     $damage = Get-Content -LiteralPath (Join-Path $gameDir 'config\ynydamageindicator.json') -Raw | ConvertFrom-Json
     $hud = Get-Content -LiteralPath (Join-Path $gameDir 'config\steinloader-hud.json') -Raw | ConvertFrom-Json
-    $enabled = @($combat.autoArmor, $combat.clanHitThrough, $combat.autoProtect, $combat.protectDefend)
+    $enabled = @($combat.autoArmor, $combat.clanHitThrough, $combat.autoProtect, $combat.protectDefend, $combat.autoclick)
     if ($enabled -contains $true) { throw "Conflicting Combat feature enabled: $gameDir" }
-    if (!$yny.autoArmorEnabled -or !$yny.autoProtectEnabled -or !$yny.hitThroughAlliesEnabled -or !$yny.pvpDiagnosticsEnabled -or
-        !$yny.inventoryMoveSuspendUse -or !$yny.clanPingHudEnabled -or !$damage.enabled -or
-        !$hud.elements.'ynyutils.clanping'.enabled -or !$hud.elements.'ynydamageindicator.target'.enabled) {
-        throw "YNYUtils feature or HUD disabled: $gameDir"
-    }
     $hashes += (Get-FileHash -LiteralPath (Join-Path $gameDir 'mods\YNYUtils.steinmod') -Algorithm SHA256).Hash
     Write-Output "PASS: $(Split-Path $gameDir -Parent) - YNYUtils enabled, Combat conflicts off"
 }

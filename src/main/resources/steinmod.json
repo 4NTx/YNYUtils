@@ -1,9 +1,12 @@
 {
   "id": "ynyutils",
   "name": "YNYUtils",
-  "version": "0.1.0",
-  "author": "Artur",
+  "version": "1.0.0",
+  "author": "4NT",
   "description": "Utilidades modulares client-side para Stein Loader.",
-  "entry": "com.yny.utils.YNYUtils",
-  "loader": "0.1.16"
+  "entry": [
+    "com.yny.utils.YNYUtils",
+    "com.yny.utils.team.SteinCombat"
+  ],
+  "loader": "0.1.25"
 }

@@ -16,6 +16,8 @@ public final class PatchClanFeatures {
     private static final String TARGET_HEALTH = "com/yny/targethealth/TargetHealthElement.class";
     private static final String TARGET_HUD = "com/yny/targethealth/TargetHudRenderer.class";
     private static final String GFX_MARKERS = "com/yny/utils/modules/clanping/GfxWorldMarkers.class";
+    private static final String HIT_THROUGH_WEB = "com/yny/utils/modules/pvp/HitThroughWeb.class";
+    private static final String YNY_UTILS = "com/yny/utils/YNYUtils.class";
 
     public static void main(String[] args) throws Exception {
         if (args.length != 2) {
@@ -27,6 +29,7 @@ public final class PatchClanFeatures {
         File outFile = new File(args[1]);
 
         byte[] hitThroughBytes = readBytes(new File("build/compiled/com/yny/utils/modules/pvp/HitThroughAllies.class"));
+        byte[] hitThroughWebBytes = readBytes(new File("build/compiled/com/yny/utils/modules/pvp/HitThroughWeb.class"));
         byte[] pingClanNameBytes = readBytes(new File("build/compiled/com/yny/utils/modules/clanping/PingClanName.class"));
         byte[] targetHealthBytes = readBytes(new File("build/compiled/com/yny/targethealth/TargetHealthElement.class"));
         byte[] targetHudBytes = readBytes(new File("build/compiled/com/yny/targethealth/TargetHudRenderer.class"));
@@ -34,6 +37,7 @@ public final class PatchClanFeatures {
 
         byte[] patchedMarkerBytes = null;
         byte[] patchedClanPingBytes = null;
+        byte[] patchedYnyUtilsBytes = null;
 
         Map<String, byte[]> outEntries = new LinkedHashMap<>();
 
@@ -49,6 +53,9 @@ public final class PatchClanFeatures {
                 } else if (CLAN_PING.equals(entry.getName())) {
                     data = patchClanPing(data);
                     patchedClanPingBytes = data;
+                } else if (YNY_UTILS.equals(entry.getName())) {
+                    data = patchYNYUtils(data);
+                    patchedYnyUtilsBytes = data;
                 } else if (HIT_THROUGH.equals(entry.getName())) {
                     data = hitThroughBytes;
                 } else if (PING_CLAN_NAME.equals(entry.getName())) {
@@ -65,9 +72,12 @@ public final class PatchClanFeatures {
             }
         }
 
-        if (patchedMarkerBytes == null || patchedClanPingBytes == null) {
+        outEntries.put(HIT_THROUGH_WEB, hitThroughWebBytes);
+
+        if (patchedMarkerBytes == null || patchedClanPingBytes == null || patchedYnyUtilsBytes == null) {
             throw new IllegalStateException("Failed to patch entries: marker=" + (patchedMarkerBytes != null)
-                    + ", clanPing=" + (patchedClanPingBytes != null));
+                    + ", clanPing=" + (patchedClanPingBytes != null)
+                    + ", ynyUtils=" + (patchedYnyUtilsBytes != null));
         }
 
         File tempOut = new File(outFile.getAbsolutePath() + ".tmp");
@@ -131,6 +141,10 @@ public final class PatchClanFeatures {
                     }
                 }
             }
+        }
+
+        if (depthPatched == 0) {
+            return original;
         }
 
         if (depthPatched != 1 || groupPatched != 1) {
@@ -216,6 +230,7 @@ public final class PatchClanFeatures {
                             jinsn.label = checkClan;
                             InsnList clanCheck = new InsnList();
                             clanCheck.add(checkClan);
+                            clanCheck.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
                             clanCheck.add(new VarInsnNode(Opcodes.ALOAD, 2)); // wn var2
                             clanCheck.add(new VarInsnNode(Opcodes.ALOAD, 2));
                             clanCheck.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "wn", "e_", "()Ljava/lang/String;", false));
@@ -238,17 +253,23 @@ public final class PatchClanFeatures {
                         AbstractInsnNode jump = nextReal(min);
                         if (jump instanceof JumpInsnNode jinsn && jinsn.getOpcode() == Opcodes.IFNULL) {
                             LabelNode locationLabel = jinsn.label;
-                            InsnList checkFriendly = new InsnList();
-                            checkFriendly.add(new InsnNode(Opcodes.DUP));
-                            checkFriendly.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "dev/xavier/stein/loader/api/Relations", "of", "(Ljava/lang/Object;)Ldev/xavier/stein/loader/api/Relation;", false));
-                            checkFriendly.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "dev/xavier/stein/loader/api/Relation", "friendly", "()Z", false));
-                            checkFriendly.add(new JumpInsnNode(Opcodes.IFNE, locationLabel)); // friendly -> location
-                            checkFriendly.add(new InsnNode(Opcodes.DUP));
-                            checkFriendly.add(new InsnNode(Opcodes.DUP));
-                            checkFriendly.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "wn", "e_", "()Ljava/lang/String;", false));
-                            checkFriendly.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "com/yny/utils/modules/clanping/PingClanName", "isSameClan", "(Ljava/lang/Object;Ljava/lang/String;)Z", false));
-                            checkFriendly.add(new JumpInsnNode(Opcodes.IFNE, locationLabel)); // same clan -> location
-                            method.instructions.insert(jinsn, checkFriendly);
+                            InsnList checkPlayer = new InsnList();
+                            checkPlayer.add(new VarInsnNode(Opcodes.ASTORE, 2));
+                            checkPlayer.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                            checkPlayer.add(new JumpInsnNode(Opcodes.IFNULL, locationLabel));
+                            checkPlayer.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                            checkPlayer.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "dev/xavier/stein/loader/api/Relations", "of", "(Ljava/lang/Object;)Ldev/xavier/stein/loader/api/Relation;", false));
+                            checkPlayer.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "dev/xavier/stein/loader/api/Relation", "friendly", "()Z", false));
+                            checkPlayer.add(new JumpInsnNode(Opcodes.IFNE, locationLabel));
+                            checkPlayer.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                            checkPlayer.add(new VarInsnNode(Opcodes.ALOAD, 2));
+                            checkPlayer.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "wn", "e_", "()Ljava/lang/String;", false));
+                            checkPlayer.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "com/yny/utils/modules/clanping/PingClanName", "isSameClan", "(Ljava/lang/Object;Ljava/lang/String;)Z", false));
+                            checkPlayer.add(new JumpInsnNode(Opcodes.IFNE, locationLabel));
+                            method.instructions.insert(min, checkPlayer);
+                            method.instructions.remove(jinsn);
+                            method.maxLocals = Math.max(method.maxLocals, 3);
+                            method.maxStack = Math.max(method.maxStack, 4);
                             quickPingPatched++;
                         }
                     }
@@ -274,6 +295,7 @@ public final class PatchClanFeatures {
                             fallback.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "java/lang/String", "equalsIgnoreCase", "(Ljava/lang/String;)Z", false));
                             fallback.add(new JumpInsnNode(Opcodes.IFEQ, skipLabel)); // Neither matched -> skip
                             fallback.add(matchedLabel);
+                            fallback.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
                             method.instructions.insertBefore(jinsn, fallback);
                             method.instructions.remove(jinsn);
                             findTargetPatched++;
@@ -317,6 +339,7 @@ public final class PatchClanFeatures {
                             jinsn.label = showLabel; // if not GROUP, check clan
                             InsnList clanCheck = new InsnList();
                             clanCheck.add(showLabel);
+                            clanCheck.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
                             clanCheck.add(new InsnNode(Opcodes.ACONST_NULL));
                             clanCheck.add(new VarInsnNode(Opcodes.ALOAD, 2));
                             clanCheck.add(new FieldInsnNode(Opcodes.GETFIELD, "com/yny/utils/modules/clanping/ClanPing$Active", "author", "Ljava/lang/String;"));
@@ -342,6 +365,10 @@ public final class PatchClanFeatures {
 
         // 9. Refine renderWorldLabel for depthMask false, disableDepth, blend, dynamic scale
         patchRenderWorldLabelMethod(node);
+
+        if (joinActivePatched == 0 && disconnectPatched == 0 && findTargetPatched == 0) {
+            return original;
+        }
 
         if (joinActivePatched != 1 || disconnectPatched != 1 || rivalPingPatched != 1
                 || quickPingPatched != 1 || findTargetPatched != 1 || receiveClanPatched != 1
@@ -441,6 +468,58 @@ public final class PatchClanFeatures {
         }
     }
 
+    public static byte[] patchYNYUtils(byte[] original) {
+        ClassNode node = read(original);
+
+        int mousePatched = 0;
+        int tickPatched = 0;
+        int attackPatched = 0;
+
+        for (MethodNode method : node.methods) {
+            if ("onMouseInput".equals(method.name) && "()V".equals(method.desc)) {
+                InsnList insns = new InsnList();
+                insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "com/yny/utils/modules/pvp/HitThroughWeb", "onMouseInput", "()V", false));
+                method.instructions.insert(insns);
+                mousePatched++;
+            }
+
+            if ("onTickEnd".equals(method.name) && "()V".equals(method.desc)) {
+                for (AbstractInsnNode insn : method.instructions.toArray()) {
+                    if (insn.getOpcode() == Opcodes.RETURN) {
+                        InsnList insns = new InsnList();
+                        insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "com/yny/utils/modules/pvp/HitThroughWeb", "onTickEnd", "()V", false));
+                        method.instructions.insertBefore(insn, insns);
+                        tickPatched++;
+                    }
+                }
+            }
+
+            if ("onAttackEntity".equals(method.name) && "(Ljava/lang/Object;)Z".equals(method.desc)) {
+                LabelNode notWeb = new LabelNode();
+                InsnList insns = new InsnList();
+                insns.add(new MethodInsnNode(Opcodes.INVOKESTATIC, "com/yny/utils/modules/pvp/HitThroughWeb", "isWebAttacking", "()Z", false));
+                insns.add(new JumpInsnNode(Opcodes.IFEQ, notWeb));
+                insns.add(new VarInsnNode(Opcodes.ALOAD, 0));
+                insns.add(new FieldInsnNode(Opcodes.GETFIELD, "com/yny/utils/YNYUtils", "autoConsumables", "Lcom/yny/utils/modules/player/AutoConsumables;"));
+                insns.add(new VarInsnNode(Opcodes.ALOAD, 1));
+                insns.add(new MethodInsnNode(Opcodes.INVOKEVIRTUAL, "com/yny/utils/modules/player/AutoConsumables", "onAttack", "(Ljava/lang/Object;)V", false));
+                insns.add(new InsnNode(Opcodes.ICONST_0));
+                insns.add(new InsnNode(Opcodes.IRETURN));
+                insns.add(notWeb);
+                insns.add(new FrameNode(Opcodes.F_SAME, 0, null, 0, null));
+                method.instructions.insert(insns);
+                method.maxStack = Math.max(method.maxStack, 4);
+                attackPatched++;
+            }
+        }
+
+        if (mousePatched != 1 || tickPatched < 1 || attackPatched != 1) {
+            throw new IllegalStateException("YNYUtils patch mismatch: mouse=" + mousePatched + ", tick=" + tickPatched + ", attack=" + attackPatched);
+        }
+
+        return write(node);
+    }
+
     private static AbstractInsnNode prevReal(AbstractInsnNode insn) {
         AbstractInsnNode p = insn != null ? insn.getPrevious() : null;
         while (p instanceof LineNumberNode || p instanceof LabelNode || p instanceof FrameNode) {
@@ -462,13 +541,24 @@ public final class PatchClanFeatures {
         compatible[6] = 0;
         compatible[7] = 60;
         ClassNode node = new ClassNode();
-        new ClassReader(compatible).accept(node, ClassReader.EXPAND_FRAMES);
+        new ClassReader(compatible).accept(node, ClassReader.SKIP_FRAMES);
         node.version = ((bytes[6] & 255) << 8) | (bytes[7] & 255);
         return node;
     }
 
     private static byte[] write(ClassNode node) {
-        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+        ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_FRAMES) {
+            @Override
+            protected String getCommonSuperClass(String type1, String type2) {
+                if (type1.equals(type2)) return type1;
+                if ("java/lang/Object".equals(type1) || "java/lang/Object".equals(type2)) return "java/lang/Object";
+                try {
+                    return super.getCommonSuperClass(type1, type2);
+                } catch (Throwable t) {
+                    return "java/lang/Object";
+                }
+            }
+        };
         node.accept(writer);
         return writer.toByteArray();
     }
